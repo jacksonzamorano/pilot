@@ -62,6 +62,7 @@ type Application[ApplicationState any, RouteState any] struct {
 	CleanRouteData   func(*RouteState)
 	Cors             string
 	Middleware       []func(*RouteState, *HttpRequest) *HttpResponse
+	SilentMode       bool
 }
 
 func NewApplication[ApplicationState any, RouteState any](port string, state *ApplicationState, MakeRouteData func(*ApplicationState, *HttpRequest) *RouteState) *Application[ApplicationState, RouteState] {
@@ -71,6 +72,7 @@ func NewApplication[ApplicationState any, RouteState any](port string, state *Ap
 		MakeRouteData:    MakeRouteData,
 		ApplicationState: state,
 		Middleware:       []func(*RouteState, *HttpRequest) *HttpResponse{},
+		SilentMode:       false,
 	}
 }
 func (a *Application[ApplicationState, RouteState]) SetCleanRouteData(crd func(*RouteState)) {
@@ -98,8 +100,10 @@ func (a *Application[ApplicationState, RouteState]) AddMiddleware(middlewareFn f
 }
 
 func (a *Application[ApplicationState, RouteState]) Start() {
-	fmt.Printf("Starting server on port %v.\n\nRegistered routes:\n", a.Port)
-	a.Router.PrintTree()
+	if !a.SilentMode {
+		fmt.Printf("Starting server on port %v.\n\nRegistered routes:\n", a.Port)
+		a.Router.PrintTree()
+	}
 	listener, err := net.Listen("tcp", fmt.Sprintf(":%s", a.Port))
 	if err != nil {
 		panic(err)
