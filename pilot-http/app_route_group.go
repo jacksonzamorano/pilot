@@ -10,7 +10,7 @@ func NewRouteGroup[RouteState any]() *RouteGroup[RouteState] {
 	}
 }
 
-func (rg *RouteGroup[RouteState]) Get(path string, middleware []MiddlewareFn[RouteState], handler RouteHandlerFn[RouteState]) *RouteGroup[RouteState] {
+func (rg *RouteGroup[RouteState]) Get(path string, handler RouteHandlerFn[RouteState], middleware ...MiddlewareFn[RouteState]) *RouteGroup[RouteState] {
 	rg.Routes = append(rg.Routes, GroupedRoute[RouteState]{
 		Route:      path,
 		Method:     Get,
@@ -19,7 +19,7 @@ func (rg *RouteGroup[RouteState]) Get(path string, middleware []MiddlewareFn[Rou
 	})
 	return rg
 }
-func (rg *RouteGroup[RouteState]) Post(path string, middleware []MiddlewareFn[RouteState], handler RouteHandlerFn[RouteState]) *RouteGroup[RouteState] {
+func (rg *RouteGroup[RouteState]) Post(path string, handler RouteHandlerFn[RouteState], middleware ...MiddlewareFn[RouteState]) *RouteGroup[RouteState] {
 	rg.Routes = append(rg.Routes, GroupedRoute[RouteState]{
 		Route:      path,
 		Method:     Post,
@@ -28,7 +28,7 @@ func (rg *RouteGroup[RouteState]) Post(path string, middleware []MiddlewareFn[Ro
 	})
 	return rg
 }
-func (rg *RouteGroup[RouteState]) Put(path string, middleware []MiddlewareFn[RouteState], handler RouteHandlerFn[RouteState]) *RouteGroup[RouteState] {
+func (rg *RouteGroup[RouteState]) Put(path string, handler RouteHandlerFn[RouteState], middleware ...MiddlewareFn[RouteState]) *RouteGroup[RouteState] {
 	rg.Routes = append(rg.Routes, GroupedRoute[RouteState]{
 		Route:      path,
 		Method:     Put,
@@ -37,19 +37,19 @@ func (rg *RouteGroup[RouteState]) Put(path string, middleware []MiddlewareFn[Rou
 	})
 	return rg
 }
-func (rg *RouteGroup[RouteState]) Patch(path string, middleware []MiddlewareFn[RouteState], handler RouteHandlerFn[RouteState]) *RouteGroup[RouteState] {
+func (rg *RouteGroup[RouteState]) Delete(path string, handler RouteHandlerFn[RouteState], middleware ...MiddlewareFn[RouteState]) *RouteGroup[RouteState] {
 	rg.Routes = append(rg.Routes, GroupedRoute[RouteState]{
 		Route:      path,
-		Method:     Patch,
+		Method:     Delete,
 		Handler:    handler,
 		Middleware: middleware,
 	})
 	return rg
 }
-func (rg *RouteGroup[RouteState]) Delete(path string, middleware []MiddlewareFn[RouteState], handler RouteHandlerFn[RouteState]) *RouteGroup[RouteState] {
+func (rg *RouteGroup[RouteState]) Patch(path string, handler RouteHandlerFn[RouteState], middleware ...MiddlewareFn[RouteState]) *RouteGroup[RouteState] {
 	rg.Routes = append(rg.Routes, GroupedRoute[RouteState]{
 		Route:      path,
-		Method:     Delete,
+		Method:     Patch,
 		Handler:    handler,
 		Middleware: middleware,
 	})
