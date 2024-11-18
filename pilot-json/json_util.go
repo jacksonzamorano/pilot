@@ -1,4 +1,4 @@
-package pilot
+package pilot_json
 
 type JsonFieldError struct {
 	field     string

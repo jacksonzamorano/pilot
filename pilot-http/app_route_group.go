@@ -1,4 +1,4 @@
-package pilot
+package pilot_http
 
 type RouteGroup[RouteState any] struct {
 	Routes []GroupedRoute[RouteState]

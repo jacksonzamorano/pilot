@@ -1,4 +1,4 @@
-package pilot
+package pilot_http
 
 type HttpMethod string
 type RequestHandler[RouteState any] func(RouteState, *HttpRequest) *HttpResponse

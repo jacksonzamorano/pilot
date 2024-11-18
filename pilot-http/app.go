@@ -1,4 +1,4 @@
-package pilot
+package pilot_http
 
 import (
 	"context"

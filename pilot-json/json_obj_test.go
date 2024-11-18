@@ -1,4 +1,4 @@
-package pilot
+package pilot_json
 
 import "testing"
 
