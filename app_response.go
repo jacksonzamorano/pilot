@@ -115,6 +115,11 @@ func (self *HttpResponse) SetHeader(key string, value string) {
 func (self *HttpResponse) SetStatus(status StatusCode) {
 	self.StatusCode = status
 }
+func (self *HttpResponse) ApplyCors(origin *string, headers *string, methods *string) {
+	self.SetHeader("Access-Control-Allow-Origin", *origin)
+	self.SetHeader("Access-Control-Allow-Headers", *headers)
+	self.SetHeader("Access-Control-Allow-Methods", *methods)
+}
 func (self *HttpResponse) Write(stream net.Conn) {
 	var output strings.Builder
 	output.WriteString("HTTP/1.1 ")

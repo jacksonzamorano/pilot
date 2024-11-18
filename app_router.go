@@ -3,19 +3,19 @@ package pilot
 import (
 	"fmt"
 	"strings"
-)
 
-type RouteHandler[RouteState any] func(*RouteState, *HttpRequest) *HttpResponse
+	"github.com/jackc/pgx/v5/pgxpool"
+)
 
 func (m HttpMethod) String() string {
 	return string(m)
 }
 
-type RouteCollection[RouteState any] struct {
+type RouteCollection[RouteState RouteStateCompatible] struct {
 	Routes []*Route[RouteState]
 }
 
-func NewRouteCollection[RouteState any]() *RouteCollection[RouteState] {
+func NewRouteCollection[RouteState RouteStateCompatible]() *RouteCollection[RouteState] {
 	return &RouteCollection[RouteState]{
 		Routes: []*Route[RouteState]{},
 	}
@@ -66,14 +66,32 @@ func (self *RouteCollection[RouteState]) FindPath(path string, create bool) *Rou
 	}
 	return node
 }
-func (self *RouteCollection[RouteState]) AddRoute(method HttpMethod, path string, handler RouteHandler[RouteState]) {
-	self.FindPath(path, true).Handlers[method] = handler
+
+func (self *RouteCollection[RouteState]) AddRoute(method HttpMethod, path string, fn RouteHandlerFn[RouteState]) {
+	self.FindPath(path, true).Handlers[method] = RouteHandler[RouteState]{
+		Handler:    fn,
+		Middleware: []MiddlewareFn[RouteState]{},
+	}
+}
+func (self *RouteCollection[RouteState]) AddRouteWithMiddleware(method HttpMethod, path string, fn RouteHandlerFn[RouteState], middleware []MiddlewareFn[RouteState]) {
+	self.FindPath(path, true).Handlers[method] = RouteHandler[RouteState]{
+		Handler:    fn,
+		Middleware: middleware,
+	}
 }
 
-type Route[RouteState any] struct {
+type RouteHandlerFn[RouteState RouteStateCompatible] func(*HttpRequest, *pgxpool.Conn, *RouteState) *HttpResponse
+type MiddlewareFn[RouteState RouteStateCompatible] func(*RouteState, *HttpRequest) *HttpResponse
+
+type Route[RouteState RouteStateCompatible] struct {
 	PathComponent string
 	Handlers      map[HttpMethod]RouteHandler[RouteState] `json:"-"`
 	Children      []*Route[RouteState]
+}
+
+type RouteHandler[RouteState RouteStateCompatible] struct {
+	Handler    RouteHandlerFn[RouteState]
+	Middleware []MiddlewareFn[RouteState]
 }
 
 func (self *Route[RouteState]) PrintTree(level int) {
@@ -90,7 +108,7 @@ func (self *Route[RouteState]) PrintTree(level int) {
 	}
 }
 
-func NewEmptyRoute[RouteState any](path string) Route[RouteState] {
+func NewEmptyRoute[RouteState RouteStateCompatible](path string) Route[RouteState] {
 	return Route[RouteState]{
 		PathComponent: path,
 		Handlers:      map[HttpMethod]RouteHandler[RouteState]{},
