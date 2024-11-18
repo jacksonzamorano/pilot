@@ -11,40 +11,40 @@ func NewRouteGroup[RouteState any](routes ...GroupedRoute[RouteState]) *RouteGro
 }
 
 // Functions for Get, post, put, patch, delete, etc.
-func GetRoute[RouteState RouteStateCompatible](path string, handler RouteHandlerFn[RouteState], middleware ...MiddlewareFn[RouteState]) *GroupedRoute[RouteState] {
-	return &GroupedRoute[RouteState]{
+func GetRoute[RouteState RouteStateCompatible](path string, handler RouteHandlerFn[RouteState], middleware ...MiddlewareFn[RouteState]) GroupedRoute[RouteState] {
+	return GroupedRoute[RouteState]{
 		Route:      path,
 		Method:     Get,
 		Handler:    handler,
 		Middleware: middleware,
 	}
 }
-func PostRoute[RouteState RouteStateCompatible](path string, handler RouteHandlerFn[RouteState], middleware ...MiddlewareFn[RouteState]) *GroupedRoute[RouteState] {
-	return &GroupedRoute[RouteState]{
+func PostRoute[RouteState RouteStateCompatible](path string, handler RouteHandlerFn[RouteState], middleware ...MiddlewareFn[RouteState]) GroupedRoute[RouteState] {
+	return GroupedRoute[RouteState]{
 		Route:      path,
 		Method:     Post,
 		Handler:    handler,
 		Middleware: middleware,
 	}
 }
-func PutRoute[RouteState RouteStateCompatible](path string, handler RouteHandlerFn[RouteState], middleware ...MiddlewareFn[RouteState]) *GroupedRoute[RouteState] {
-	return &GroupedRoute[RouteState]{
+func PutRoute[RouteState RouteStateCompatible](path string, handler RouteHandlerFn[RouteState], middleware ...MiddlewareFn[RouteState]) GroupedRoute[RouteState] {
+	return GroupedRoute[RouteState]{
 		Route:      path,
 		Method:     Put,
 		Handler:    handler,
 		Middleware: middleware,
 	}
 }
-func PatchRoute[RouteState RouteStateCompatible](path string, handler RouteHandlerFn[RouteState], middleware ...MiddlewareFn[RouteState]) *GroupedRoute[RouteState] {
-	return &GroupedRoute[RouteState]{
+func PatchRoute[RouteState RouteStateCompatible](path string, handler RouteHandlerFn[RouteState], middleware ...MiddlewareFn[RouteState]) GroupedRoute[RouteState] {
+	return GroupedRoute[RouteState]{
 		Route:      path,
 		Method:     Patch,
 		Handler:    handler,
 		Middleware: middleware,
 	}
 }
-func DeleteRoute[RouteState RouteStateCompatible](path string, handler RouteHandlerFn[RouteState], middleware ...MiddlewareFn[RouteState]) *GroupedRoute[RouteState] {
-	return &GroupedRoute[RouteState]{
+func DeleteRoute[RouteState RouteStateCompatible](path string, handler RouteHandlerFn[RouteState], middleware ...MiddlewareFn[RouteState]) GroupedRoute[RouteState] {
+	return GroupedRoute[RouteState]{
 		Route:      path,
 		Method:     Delete,
 		Handler:    handler,
