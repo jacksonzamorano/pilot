@@ -24,7 +24,7 @@ func (this *JsonFieldError) Error() string {
 	if this.found {
 		return "Field " + this.field + " is invalid. Expected " + this.valueType
 	} else {
-		return "Invalid JSON recieved."
+		return this.field + " is required."
 	}
 }
 
