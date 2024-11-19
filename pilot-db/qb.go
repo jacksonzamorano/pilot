@@ -20,6 +20,17 @@ func (e NoRowError) Error() string {
 	return "No data found"
 }
 
+func BeginTransaction(conn *pgxpool.Conn) *pgx.Tx {
+	tx, err := conn.Begin(context.Background())
+	if err != nil {
+		panic(err)
+	}
+	return &tx
+}
+func EndTransaction(tx pgx.Tx) error {
+	return tx.Commit(context.Background())
+}
+
 type FromTableFn[T any] func(row pgx.Rows) (*T, error)
 
 type QueryBuilder[T any] struct {
@@ -444,7 +455,7 @@ func (b QueryBuilder[T]) BuildOffset(idx int, selectResults bool) (string, []any
 
 func (builder *QueryBuilder[T]) QueryOne(ctx context.Context, conn *pgxpool.Conn) (*T, *QueryBuilderError) {
 	query, args := builder.Build()
-	rows, err := conn.Query(ctx, query, args...)
+	rows, err := (*conn).Query(ctx, query, args...)
 	defer rows.Close()
 	if err != nil {
 		return nil, PostgresError(builder.from, err)
@@ -465,7 +476,7 @@ func (builder *QueryBuilder[T]) QueryOne(ctx context.Context, conn *pgxpool.Conn
 func (builder *QueryBuilder[T]) QueryMany(ctx context.Context, conn *pgxpool.Conn) (*[]T, *QueryBuilderError) {
 	results := []T{}
 	query, args := builder.Build()
-	rows, err := conn.Query(ctx, query, args...)
+	rows, err := (*conn).Query(ctx, query, args...)
 	defer rows.Close()
 	if err != nil {
 		return &results, PostgresError(builder.from, err)
@@ -482,6 +493,15 @@ func (builder *QueryBuilder[T]) QueryMany(ctx context.Context, conn *pgxpool.Con
 		return &results, PostgresError(builder.from, rows.Err())
 	}
 	return &results, nil
+}
+func (builder *QueryBuilder[T]) QueryInTransaction(ctx context.Context, tx *pgx.Tx) *QueryBuilderError {
+	query, args := builder.Build()
+	rows, err := (*tx).Query(ctx, query, args...)
+	defer rows.Close()
+	if err != nil {
+		return PostgresError(builder.from, err)
+	}
+	return nil
 }
 
 type queryBuilderAlias interface {
