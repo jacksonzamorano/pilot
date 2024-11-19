@@ -2,11 +2,13 @@ package pilot_db
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"strings"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	pilot_http "github.com/jacksonzamorano/pilot/pilot-http"
 	"golang.org/x/text/cases"
@@ -608,6 +610,13 @@ func (e QueryBuilderError) Error() string {
 	}
 	return friendlyName + " not found"
 }
+func (e *QueryBuilderError) Violates(code *PostgresErrorCode) bool {
+	var pgError *pgconn.PgError
+	if errors.As(e.genericError, &pgError) {
+		return pgError.Code == string(*code)
+	}
+	return false
+}
 func PostgresError(table string, err error) *QueryBuilderError {
 	return &QueryBuilderError{
 		table:        table,
@@ -658,3 +667,12 @@ type QuerySort struct {
 	field string
 	order string
 }
+
+type PostgresErrorCode string
+
+const (
+	PostgresErrorCodeUniqueViolation PostgresErrorCode = "23505"
+	PostgresErrorCodeNotNullViolation PostgresErrorCode = "23502"
+	PostgresErrorCodeForeignKeyViolation PostgresErrorCode = "23503"
+	PostgresErrorCodeCheckViolation PostgresErrorCode = "23514"
+)
