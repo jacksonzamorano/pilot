@@ -42,7 +42,7 @@ func handleRequest[RouteState any](conn net.Conn, app *Application[RouteState]) 
 		return
 	}
 
-	routeState := (*app.GlobalMiddleware)(request)
+	routeState := (app.GlobalMiddleware)(request)
 
 	for i := range handler.Middleware {
 		response = handler.Middleware[i](routeState, request)
@@ -62,7 +62,7 @@ func handleRequest[RouteState any](conn net.Conn, app *Application[RouteState]) 
 }
 
 type Application[RouteState RouteStateCompatible] struct {
-	GlobalMiddleware *func(*HttpRequest) *RouteState
+	GlobalMiddleware func(*HttpRequest) *RouteState
 	Port             string
 	Routes           *RouteCollection[RouteState]
 	CorsOrigin       string
@@ -72,7 +72,7 @@ type Application[RouteState RouteStateCompatible] struct {
 	Database         *pgxpool.Pool
 }
 
-func NewApplication[RouteState any](port string, cfg DatabaseConfiguration) *Application[RouteState] {
+func NewApplication[RouteState any](port string, cfg DatabaseConfiguration, middlewareFn func(*HttpRequest) *RouteState) *Application[RouteState] {
 	pool, err := pgxpool.New(context.Background(), cfg.GetConnectionString())
 	if err != nil {
 		panic(err)
@@ -85,8 +85,8 @@ func NewApplication[RouteState any](port string, cfg DatabaseConfiguration) *App
 		CorsMethods:      "GET, PUT, POST, DELETE, HEAD",
 		Routes:           NewRouteCollection[RouteState](),
 		SilentMode:       false,
-		GlobalMiddleware: nil,
 		Database:         pool,
+		GlobalMiddleware: middlewareFn,
 	}
 }
 func (a *Application[RouteState]) AddRouteGroup(prefix string, rg *RouteGroup[RouteState]) {
