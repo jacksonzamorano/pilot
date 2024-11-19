@@ -40,7 +40,7 @@ func (req *HttpRequest) QueryMap() map[string]string {
 	}
 	return res
 }
-func (req *HttpRequest) QueryInt32(key string) *int32 {
+func (req *HttpRequest) QueryGetInt32(key string) *int32 {
 	if req._tempMap == nil {
 		m := req.QueryMap()
 		req._tempMap = &m
@@ -52,6 +52,32 @@ func (req *HttpRequest) QueryInt32(key string) *int32 {
 			v := int32(num)
 			return &v
 		}
+	}
+	return nil
+}
+func (req *HttpRequest) QueryGetInt64(key string) *int64 {
+	if req._tempMap == nil {
+		m := req.QueryMap()
+		req._tempMap = &m
+	}
+	val, ok := (*req._tempMap)[key]
+	if ok {
+		num, err := strconv.Atoi(val)
+		if err == nil {
+			v := int64(num)
+			return &v
+		}
+	}
+	return nil
+}
+func (req *HttpRequest) QueryGetString(key string) *string {
+	if req._tempMap == nil {
+		m := req.QueryMap()
+		req._tempMap = &m
+	}
+	val, ok := (*req._tempMap)[key]
+	if ok {
+		return &val
 	}
 	return nil
 }
