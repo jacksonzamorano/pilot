@@ -237,6 +237,14 @@ func (b *QueryBuilder[T]) WhereLikeInsensitive(field string, values any) *QueryB
 	b.Where(field, " ILIKE $", values)
 	return b
 }
+func (b *QueryBuilder[T]) Or() *QueryBuilder[T] {
+	b.where = append(b.where, QueryWhere{where: "OR", arg: nil})
+	return b
+}
+func (b *QueryBuilder[T]) And() *QueryBuilder[T] {
+	b.where = append(b.where, QueryWhere{where: "AND", arg: nil})
+	return b
+}
 func (b *QueryBuilder[T]) SortAsc(field string) *QueryBuilder[T] {
 	if b.lastJoin == nil {
 		b.sort = append(b.sort, QuerySort{field: b.from + "." + field, order: "ASC"})
