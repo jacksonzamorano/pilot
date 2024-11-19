@@ -45,7 +45,7 @@ func handleRequest[RouteState any](conn net.Conn, app *Application[RouteState]) 
 	routeState := (app.GlobalMiddleware)(request)
 
 	for i := range handler.Middleware {
-		response = handler.Middleware[i](routeState, request)
+		response = handler.Middleware[i](request, db, routeState)
 		if response != nil {
 			response.ApplyCors(&app.CorsOrigin, &app.CorsHeaders, &app.CorsMethods)
 			response.Write(conn)

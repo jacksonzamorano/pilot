@@ -81,7 +81,7 @@ func (self *RouteCollection[RouteState]) AddRouteWithMiddleware(method HttpMetho
 }
 
 type RouteHandlerFn[RouteState RouteStateCompatible] func(*HttpRequest, *pgxpool.Conn, *RouteState) *HttpResponse
-type MiddlewareFn[RouteState RouteStateCompatible] func(*RouteState, *HttpRequest) *HttpResponse
+type MiddlewareFn[RouteState RouteStateCompatible] func(*HttpRequest, *pgxpool.Conn, *RouteState) *HttpResponse
 
 type Route[RouteState RouteStateCompatible] struct {
 	PathComponent string
