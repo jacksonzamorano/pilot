@@ -610,10 +610,10 @@ func (e QueryBuilderError) Error() string {
 	}
 	return friendlyName + " not found"
 }
-func (e *QueryBuilderError) Violates(code *PostgresErrorCode) bool {
+func (e *QueryBuilderError) Violates(code PostgresErrorCode) bool {
 	var pgError *pgconn.PgError
 	if errors.As(e.genericError, &pgError) {
-		return pgError.Code == string(*code)
+		return pgError.Code == string(code)
 	}
 	return false
 }
