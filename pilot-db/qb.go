@@ -110,7 +110,7 @@ func (b *QueryBuilder[T]) Set(field string, value any) *QueryBuilder[T] {
 	lastRecord := len(b.set) - 1
 	_, fieldAtLast := b.set[lastRecord][field]
 	if !fieldAtLast {
-		if lastRecord > 0 {
+		if lastRecord > 1 {
 			_, inLast := b.set[lastRecord-1][field]
 			if !inLast {
 				log.Fatal("Attempted to set a field in a bulk insert which wasn't in the previous row. Bulk inserts require the same arguments in every row")
@@ -135,7 +135,7 @@ func (b *QueryBuilder[T]) SetLiteral(field string, value string) *QueryBuilder[T
 	lastRecord := len(b.set) - 1
 	_, fieldAtLast := b.set[lastRecord][field]
 	if !fieldAtLast {
-		if lastRecord > 0 {
+		if lastRecord > 1 {
 			_, inLast := b.set[lastRecord-1][field]
 			if !inLast {
 				log.Fatal("Attempted to set a field in a bulk insert which wasn't in the previous row. Bulk inserts require the same arguments in every row")
