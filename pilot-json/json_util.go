@@ -22,9 +22,9 @@ func (this *JsonFieldError) AddPath(field string) {
 
 func (this *JsonFieldError) Error() string {
 	if this.found {
-		return "Field " + this.field + " is invalid. Expected " + this.valueType
+		return "Field '" + this.field + "' is invalid. Expected " + this.valueType
 	} else {
-		return this.field + " is required."
+		return "Field '" + this.field + "' is required."
 	}
 }
 
