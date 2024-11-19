@@ -473,7 +473,7 @@ func (b QueryBuilder[T]) BuildOffset(idx int, selectResults bool) (string, []any
 	return query_final, args
 }
 
-func (builder *QueryBuilder[T]) QueryOne(ctx context.Context, conn *pgxpool.Conn) (*T, *QueryBuilderError) {
+func (builder *QueryBuilder[T]) QueryOneExpect(ctx context.Context, conn *pgxpool.Conn) (*T, *QueryBuilderError) {
 	query, args := builder.Build()
 	rows, err := (*conn).Query(ctx, query, args...)
 	defer rows.Close()
@@ -492,6 +492,26 @@ func (builder *QueryBuilder[T]) QueryOne(ctx context.Context, conn *pgxpool.Conn
 		return nil, PostgresError(builder.from, rows.Err())
 	}
 	return nil, NotFoundError(builder.from)
+}
+func (builder *QueryBuilder[T]) QueryOne(ctx context.Context, conn *pgxpool.Conn) (*T, *QueryBuilderError) {
+	query, args := builder.Build()
+	rows, err := (*conn).Query(ctx, query, args...)
+	defer rows.Close()
+	if err != nil {
+		return nil, PostgresError(builder.from, err)
+	}
+	for rows.Next() {
+		value, err := builder.conversion(rows)
+		if err != nil {
+			return nil, PostgresError(builder.from, err)
+		}
+		return value, nil
+	}
+	rows.Close()
+	if rows.Err() != nil {
+		return nil, PostgresError(builder.from, rows.Err())
+	}
+	return nil, nil
 }
 func (builder *QueryBuilder[T]) QueryMany(ctx context.Context, conn *pgxpool.Conn) (*[]T, *QueryBuilderError) {
 	results := []T{}
