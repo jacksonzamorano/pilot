@@ -202,7 +202,7 @@ func (b *QueryBuilder[T]) Where(field string, where string, arg any) *QueryBuild
 	} else {
 		discoveredField = b.from + "." + field
 	}
-	b.where = append(b.where, QueryWhere{where: discoveredField + " " + where, arg: arg})
+	b.where = append(b.where, QueryWhere{where: discoveredField + " " + where, arg: arg, joinWith: ""})
 	return b
 }
 func (b *QueryBuilder[T]) WhereEq(field string, arg any) *QueryBuilder[T] {
@@ -238,11 +238,19 @@ func (b *QueryBuilder[T]) WhereLikeInsensitive(field string, values any) *QueryB
 	return b
 }
 func (b *QueryBuilder[T]) Or() *QueryBuilder[T] {
-	b.where = append(b.where, QueryWhere{where: "OR", arg: nil})
+	if len(b.where) > 0 {
+		b.where[len(b.where)-1].joinWith = "OR"
+	} else {
+		log.Fatalf("Or() called without any previous Where-style call")
+	}
 	return b
 }
 func (b *QueryBuilder[T]) And() *QueryBuilder[T] {
-	b.where = append(b.where, QueryWhere{where: "AND", arg: nil})
+	if len(b.where) > 0 {
+		b.where[len(b.where)-1].joinWith = "AND"
+	} else {
+		log.Fatalf("And() called without any previous Where-style call")
+	}
 	return b
 }
 func (b *QueryBuilder[T]) SortAsc(field string) *QueryBuilder[T] {
@@ -385,7 +393,11 @@ func (b *QueryBuilder[T]) whereToString() (string, []any) {
 		if b.where[whereIdx].arg != nil {
 			args = append(args, b.where[whereIdx].arg)
 		}
-		query += " AND "
+		if b.where[whereIdx].joinWith != "" {
+			query += " " + b.where[whereIdx].joinWith + " "
+		} else {
+			query += " AND "
+		}
 	}
 	return query[:len(query)-5], args
 }
@@ -637,8 +649,9 @@ type QueryJoin struct {
 }
 
 type QueryWhere struct {
-	where string
-	arg   any
+	where    string
+	arg      any
+	joinWith string
 }
 
 type QuerySort struct {
