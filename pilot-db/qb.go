@@ -225,15 +225,15 @@ func (b *QueryBuilder[T]) WhereNotNull(field string) *QueryBuilder[T] {
 	b.Where(field, " IS NOT NULL", nil)
 	return b
 }
-func (b *QueryBuilder[T]) WhereLike(field string, values ...any) *QueryBuilder[T] {
+func (b *QueryBuilder[T]) WhereLike(field string, values any) *QueryBuilder[T] {
 	b.Where(field, " LIKE $", values)
 	return b
 }
-func (b *QueryBuilder[T]) WhereNotLike(field string, values ...any) *QueryBuilder[T] {
+func (b *QueryBuilder[T]) WhereNotLike(field string, values any) *QueryBuilder[T] {
 	b.Where(field, " NOT LIKE $", values)
 	return b
 }
-func (b *QueryBuilder[T]) WhereLikeInsensitive(field string, values ...any) *QueryBuilder[T] {
+func (b *QueryBuilder[T]) WhereLikeInsensitive(field string, values any) *QueryBuilder[T] {
 	b.Where(field, " ILIKE $", values)
 	return b
 }
