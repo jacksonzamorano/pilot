@@ -215,6 +215,22 @@ func (b *QueryBuilder[T]) WhereNe(field string, arg any) *QueryBuilder[T] {
 	b.Where(field, " <> $", arg)
 	return b
 }
+func (b *QueryBuilder[T]) WhereLt(field string, arg any) *QueryBuilder[T] {
+	b.Where(field, " < $", arg)
+	return b
+}
+func (b *QueryBuilder[T]) WhereLte(field string, arg any) *QueryBuilder[T] {
+	b.Where(field, " <= $", arg)
+	return b
+}
+func (b *QueryBuilder[T]) WhereGt(field string, arg any) *QueryBuilder[T] {
+	b.Where(field, " > $", arg)
+	return b
+}
+func (b *QueryBuilder[T]) WhereGte(field string, arg any) *QueryBuilder[T] {
+	b.Where(field, " >= $", arg)
+	return b
+}
 func (b *QueryBuilder[T]) WhereAny(field string, arg any) *QueryBuilder[T] {
 	b.Where(field, " = ANY($)", arg)
 	return b
