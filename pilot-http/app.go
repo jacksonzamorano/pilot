@@ -2,6 +2,7 @@ package pilot_http
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"net"
@@ -82,10 +83,10 @@ func (a *Application[RouteState]) Start() {
 		for {
 			conn, err := listener.Accept()
 			if err != nil {
-				if err != net.ErrClosed {
-					panic(err)
-				} else {
+				if errors.Is(err, net.ErrClosed) {
 					return
+				} else {
+					panic(err)
 				}
 			}
 			recvQueue <- conn
