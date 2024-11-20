@@ -143,7 +143,6 @@ func handleRequest[RouteState any](conn <-chan net.Conn, app *Application[RouteS
 		select {
 		case <-context.Done():
 			db.Release()
-			log.Println("Pilot worker stopped.")
 			return
 		case conn := <-conn:
 			request := ParseRequest(&conn)
