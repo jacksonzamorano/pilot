@@ -3,63 +3,16 @@ package pilot_http
 import (
 	"context"
 	"fmt"
+	"log"
 	"net"
+	"os"
+	"os/signal"
 	"strings"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type RouteStateCompatible interface{}
-
-func handleRequest[RouteState any](conn net.Conn, app *Application[RouteState]) {
-	db, err := (*app).Database.Acquire(context.Background())
-	if err != nil {
-		panic(err)
-	}
-	defer db.Release()
-	defer conn.Close()
-	request := ParseRequest(&conn)
-	if request == nil {
-		return
-	}
-
-	response := StringResponse("")
-	response.Body = []byte("404 not found")
-	response.SetStatus(StatusNotFound)
-	response.ApplyCors(&app.CorsOrigin, &app.CorsHeaders, &app.CorsMethods)
-	if request.Method == Options {
-		response.Write(conn)
-		return
-	}
-	route := (*app).Routes.FindPath(request.Path, false)
-	if route == nil {
-		response.Write(conn)
-		return
-	}
-	handler, found := route.Handlers[request.Method]
-	if !found {
-		response.Write(conn)
-		return
-	}
-
-	routeState := (app.GlobalMiddleware)(request)
-
-	for i := range handler.Middleware {
-		response = handler.Middleware[i](request, db, routeState)
-		if response != nil {
-			response.ApplyCors(&app.CorsOrigin, &app.CorsHeaders, &app.CorsMethods)
-			response.Write(conn)
-			return
-		}
-	}
-
-	response = handler.Handler(request, db, routeState)
-	if response == nil {
-		response = StringResponse("500 Internal Server Error")
-	}
-	response.ApplyCors(&app.CorsOrigin, &app.CorsHeaders, &app.CorsMethods)
-	response.Write(conn)
-}
 
 type Application[RouteState RouteStateCompatible] struct {
 	GlobalMiddleware func(*HttpRequest) *RouteState
@@ -70,10 +23,12 @@ type Application[RouteState RouteStateCompatible] struct {
 	CorsMethods      string
 	SilentMode       bool
 	Database         *pgxpool.Pool
+	Context          context.Context
+	WorkerCount      int32
 }
 
-func NewApplication[RouteState any](port string, cfg DatabaseConfiguration, middlewareFn func(*HttpRequest) *RouteState) *Application[RouteState] {
-	pool, err := pgxpool.New(context.Background(), cfg.GetConnectionString())
+func NewApplication[RouteState any](port string, cfg DatabaseConfiguration, middlewareFn func(*HttpRequest) *RouteState, ctx context.Context) *Application[RouteState] {
+	pool, err := pgxpool.New(ctx, cfg.GetConnectionString())
 	if err != nil {
 		panic(err)
 	}
@@ -87,6 +42,8 @@ func NewApplication[RouteState any](port string, cfg DatabaseConfiguration, midd
 		SilentMode:       false,
 		Database:         pool,
 		GlobalMiddleware: middlewareFn,
+		WorkerCount:      10,
+		Context:          ctx,
 	}
 }
 func (a *Application[RouteState]) AddRouteGroup(prefix string, rg *RouteGroup[RouteState]) {
@@ -111,17 +68,96 @@ func (a *Application[RouteState]) Start() {
 		fmt.Printf("Starting server on port %v.\n\nRegistered routes:\n", a.Port)
 		a.Routes.PrintTree()
 	}
+	(*a).Database.Config().MaxConns = a.WorkerCount
 	listener, err := net.Listen("tcp", fmt.Sprintf(":%s", a.Port))
 	if err != nil {
 		panic(err)
 	}
-	defer listener.Close()
-
-	for {
-		conn, err := listener.Accept()
-		if err != nil {
-			panic(err)
-		}
-		go handleRequest(conn, a)
+	queue := make(chan net.Conn, a.WorkerCount*10)
+	recvQueue := make(chan net.Conn, a.WorkerCount*10)
+	for i := int32(0); i < a.WorkerCount; i++ {
+		go handleRequest(queue, a, (*a).Context)
 	}
+	go func() {
+		for {
+			conn, err := listener.Accept()
+			if err != nil {
+				panic(err)
+			}
+			recvQueue <- conn
+		}
+	}()
+	func() {
+		for {
+			select {
+			case <-(*a).Context.Done():
+				log.Println("Stopping server...")
+				listener.Close()
+				return
+			case conn := <-recvQueue:
+				queue <- conn
+			}
+		}
+	}()
+}
+
+func handleRequest[RouteState any](conn <-chan net.Conn, app *Application[RouteState], context context.Context) {
+	db, err := (*app).Database.Acquire(context)
+	if err != nil {
+		panic(err)
+	}
+	for {
+		select {
+		case <-context.Done():
+			log.Println("Stopping worker...")
+			db.Release()
+			return
+		case conn := <-conn:
+			request := ParseRequest(&conn)
+			if request == nil {
+				return
+			}
+
+			response := StringResponse("")
+			response.Body = []byte("404 not found")
+			response.SetStatus(StatusNotFound)
+			response.ApplyCors(&app.CorsOrigin, &app.CorsHeaders, &app.CorsMethods)
+			if request.Method == Options {
+				response.Write(conn)
+				return
+			}
+			route := (*app).Routes.FindPath(request.Path, false)
+			if route == nil {
+				response.Write(conn)
+				return
+			}
+			handler, found := route.Handlers[request.Method]
+			if !found {
+				response.Write(conn)
+				return
+			}
+
+			routeState := (app.GlobalMiddleware)(request)
+
+			for i := range handler.Middleware {
+				response = handler.Middleware[i](request, db, routeState)
+				if response != nil {
+					response.ApplyCors(&app.CorsOrigin, &app.CorsHeaders, &app.CorsMethods)
+					response.Write(conn)
+					return
+				}
+			}
+
+			response = handler.Handler(request, db, routeState)
+			if response == nil {
+				response = StringResponse("500 Internal Server Error")
+			}
+			response.ApplyCors(&app.CorsOrigin, &app.CorsHeaders, &app.CorsMethods)
+			response.Write(conn)
+		}
+	}
+}
+
+func DefaultContext() (context.Context, context.CancelFunc) {
+	return signal.NotifyContext(context.Background(), os.Interrupt, os.Kill)
 }
