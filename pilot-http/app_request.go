@@ -117,7 +117,7 @@ func ParseRequest(incoming *net.Conn) *HttpRequest {
 		return nil
 	}
 	req.Path = string(bytes[:len(bytes)-1])
-	bytes, err = bufReader.ReadBytes(' ')
+	bytes, err = bufReader.ReadBytes('\n')
 	if err != nil {
 		log.Println(err)
 		return nil
@@ -127,7 +127,6 @@ func ParseRequest(incoming *net.Conn) *HttpRequest {
 		req.QueryString = req.Path[qryIdx+1:]
 		req.Path = req.Path[0:qryIdx]
 	}
-	bufReader.ReadBytes('\n')
 	for {
 		bytes, err = bufReader.ReadBytes('\n')
 		if err != nil {
