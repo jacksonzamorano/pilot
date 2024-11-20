@@ -27,7 +27,7 @@ type Application[RouteState RouteStateCompatible] struct {
 	Database         *pgxpool.Pool
 	Context          context.Context
 	WorkerCount      int32
-	LogRequests      bool
+	LogRequestsLevel int
 }
 
 func NewInlineApplication[RouteState any](port string, cfg DatabaseConfiguration, middlewareFn func(*HttpRequest) *RouteState, ctx context.Context) *Application[RouteState] {
@@ -47,7 +47,7 @@ func NewInlineApplication[RouteState any](port string, cfg DatabaseConfiguration
 		GlobalMiddleware: middlewareFn,
 		WorkerCount:      10,
 		Context:          ctx,
-		LogRequests:      true,
+		LogRequestsLevel: 0,
 	}
 }
 
@@ -69,6 +69,7 @@ func NewApplication[RouteState any](port string, cfg DatabaseConfiguration, midd
 		GlobalMiddleware: middlewareFn,
 		WorkerCount:      10,
 		Context:          ctx,
+		LogRequestsLevel: 0,
 	}
 }
 func (a *Application[RouteState]) AddRouteGroup(prefix string, rg *RouteGroup[RouteState]) {
@@ -118,6 +119,9 @@ func (a *Application[RouteState]) Start() {
 					panic(err)
 				}
 			}
+			if (*a).LogRequestsLevel > 1 {
+				log.Printf("{reciever} Dispatching connection from %s\n", conn.RemoteAddr().String())
+			}
 			recvQueue <- conn
 		}
 	}()
@@ -154,7 +158,7 @@ ReqLoop:
 			return
 		case conn := <-conn:
 			connId++
-			if (*app).LogRequests {
+			if (*app).LogRequestsLevel > 1 {
 				handlerLog(id, connId, conn.RemoteAddr(), "Request dispatched.")
 			}
 			request := ParseRequest(&conn)
@@ -162,7 +166,7 @@ ReqLoop:
 				handlerLog(id, connId, conn.RemoteAddr(), "Could not parse request.")
 				continue ReqLoop
 			}
-			if (*app).LogRequests {
+			if (*app).LogRequestsLevel > 0 {
 				handlerLog(id, connId, conn.RemoteAddr(), fmt.Sprintf("%s: '%s'", request.Method, request.Path))
 			}
 
@@ -177,7 +181,7 @@ ReqLoop:
 			route := (*app).Routes.FindPath(request.Path, false)
 			if route == nil {
 				response.Write(conn)
-				if (*app).LogRequests {
+				if (*app).LogRequestsLevel > 1 {
 					handlerLog(id, connId, conn.RemoteAddr(), "No route found.")
 				}
 				continue ReqLoop
@@ -185,7 +189,7 @@ ReqLoop:
 			handler, found := route.Handlers[request.Method]
 			if !found {
 				response.Write(conn)
-				if (*app).LogRequests {
+				if (*app).LogRequestsLevel > 1 {
 					handlerLog(id, connId, conn.RemoteAddr(), "No handler found.")
 				}
 				continue ReqLoop
