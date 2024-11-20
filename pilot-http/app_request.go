@@ -156,7 +156,5 @@ func ParseRequest(incoming *net.Conn) *HttpRequest {
 		req.Body = body
 	}
 
-	req.Dump()
-
 	return &req
 }
