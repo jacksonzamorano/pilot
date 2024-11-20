@@ -82,7 +82,11 @@ func (a *Application[RouteState]) Start() {
 		for {
 			conn, err := listener.Accept()
 			if err != nil {
-				panic(err)
+				if err != net.ErrClosed {
+					panic(err)
+				} else {
+					return
+				}
 			}
 			recvQueue <- conn
 		}
