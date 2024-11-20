@@ -1,11 +1,13 @@
 package pilot_http
 
 import (
+	"bufio"
+	"fmt"
+	"log"
 	"net"
 	"net/url"
 	"strconv"
 	"strings"
-	"time"
 )
 
 type HttpRequest struct {
@@ -82,8 +84,20 @@ func (req *HttpRequest) QueryGetString(key string) *string {
 	return nil
 }
 
+func (req *HttpRequest) Dump() {
+	fmt.Printf("Method: %v\n", req.Method)
+	fmt.Printf("Path: %v\n", req.Path)
+	fmt.Printf("QueryString: %v\n", req.QueryString)
+	for k, v := range req.Headers {
+		fmt.Printf("Header: '%v': '%v'\n", k, v)
+	}
+	if req.Body != nil {
+		fmt.Printf("Body: %v\n", string(req.Body))
+	}
+}
+
 func ParseRequest(incoming *net.Conn) *HttpRequest {
-	(*incoming).SetReadDeadline(time.Now().Add(time.Second * 2))
+	// (*incoming).SetReadDeadline(time.Now().Add(time.Second * 2))
 	req := HttpRequest{
 		Path:        "",
 		Method:      "",
@@ -92,32 +106,57 @@ func ParseRequest(incoming *net.Conn) *HttpRequest {
 		QueryString: "",
 	}
 
-	buf := NewBuf(incoming)
-
-	req.Method = HttpMethods[string(buf.ReadUntil(' '))]
-	req.Path, req.QueryString = buf.ReadPath()
-	if strings.HasSuffix(req.Path, "/") && len(req.Path) > 1 {
-		req.Path = req.Path[:len(req.Path)-1]
+	bufReader := bufio.NewReader(*incoming)
+	bytes, err := bufReader.ReadBytes(' ')
+	if err != nil {
+		return nil
 	}
-	buf.ShiftThrough('\n')
+	req.Method = HttpMethods[string(bytes)]
+	bytes, err = bufReader.ReadBytes(' ')
+	if err != nil {
+		return nil
+	}
+	req.Path = string(bytes)
+	bytes, err = bufReader.ReadBytes(' ')
+	if err != nil {
+		log.Println(err)
+		return nil
+	}
+	qryIdx := strings.Index(req.Path, "?") 
+	if qryIdx > -1 {
+		req.QueryString = req.Path[qryIdx+1:]
+		req.Path = req.Path[0:qryIdx]
+	}
+	bufReader.ReadBytes('\n')
 	for {
-		if buf.EndsHeader() {
+		bytes, err = bufReader.ReadBytes('\n')
+		if err != nil {
+			return nil
+		}
+		if bytes[0] == '\r' {
 			break
 		}
-		key := buf.ReadHeaderKey()
-		value := buf.ReadLine()
-		req.Headers[string(key)] = string(value)
-	}
-	header, ok := req.Headers["Content-Length"]
-	if ok {
-		bc, err := strconv.Atoi(header);
-		if err == nil {
-			req.Body = buf.ReadExact(bc)
-			if len(req.Body) != bc {
-				return nil
-			}
+		if bytes[0] == '\n' {
+			continue
 		}
+		header := string(bytes)
+		header = header[0:len(header)-2]
+		split := strings.Split(header, ":")
+		req.Headers[split[0]] = split[1][1:]
 	}
+
+	// Read body
+	if req.Headers["Content-Length"] != "" {
+		bodyLength, _ := strconv.Atoi(req.Headers["Content-Length"])
+		body := make([]byte, bodyLength)
+		_, err = bufReader.Read(body)
+		if err != nil {
+			return nil
+		}
+		req.Body = body
+	}
+
+	req.Dump()
 
 	return &req
 }
