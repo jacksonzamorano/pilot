@@ -139,7 +139,7 @@ func handleRequest[RouteState any](conn <-chan net.Conn, app *Application[RouteS
 	if err != nil {
 		panic(err)
 	}
-	for {
+	ReqLoop: for {
 		select {
 		case <-context.Done():
 			db.Release()
@@ -147,7 +147,7 @@ func handleRequest[RouteState any](conn <-chan net.Conn, app *Application[RouteS
 		case conn := <-conn:
 			request := ParseRequest(&conn)
 			if request == nil {
-				continue
+				continue ReqLoop
 			}
 
 			response := StringResponse("")
@@ -156,17 +156,17 @@ func handleRequest[RouteState any](conn <-chan net.Conn, app *Application[RouteS
 			response.ApplyCors(&app.CorsOrigin, &app.CorsHeaders, &app.CorsMethods)
 			if request.Method == Options {
 				response.Write(conn)
-				continue
+				continue ReqLoop
 			}
 			route := (*app).Routes.FindPath(request.Path, false)
 			if route == nil {
 				response.Write(conn)
-				continue
+				continue ReqLoop
 			}
 			handler, found := route.Handlers[request.Method]
 			if !found {
 				response.Write(conn)
-				continue
+				continue ReqLoop
 			}
 
 			routeState := (app.GlobalMiddleware)(request)
@@ -176,7 +176,7 @@ func handleRequest[RouteState any](conn <-chan net.Conn, app *Application[RouteS
 				if response != nil {
 					response.ApplyCors(&app.CorsOrigin, &app.CorsHeaders, &app.CorsMethods)
 					response.Write(conn)
-					continue
+					continue ReqLoop
 				}
 			}
 

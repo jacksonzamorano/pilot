@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type HttpRequest struct {
@@ -97,7 +98,7 @@ func (req *HttpRequest) Dump() {
 }
 
 func ParseRequest(incoming *net.Conn) *HttpRequest {
-	// (*incoming).SetReadDeadline(time.Now().Add(time.Second * 2))
+	(*incoming).SetReadDeadline(time.Now().Add(time.Second * 5))
 	req := HttpRequest{
 		Path:        "",
 		Method:      "",
