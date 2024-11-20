@@ -27,6 +27,7 @@ type Application[RouteState RouteStateCompatible] struct {
 	Database         *pgxpool.Pool
 	Context          context.Context
 	WorkerCount      int32
+	LogRequests      bool
 }
 
 func NewInlineApplication[RouteState any](port string, cfg DatabaseConfiguration, middlewareFn func(*HttpRequest) *RouteState, ctx context.Context) *Application[RouteState] {
@@ -46,6 +47,7 @@ func NewInlineApplication[RouteState any](port string, cfg DatabaseConfiguration
 		GlobalMiddleware: middlewareFn,
 		WorkerCount:      10,
 		Context:          ctx,
+		LogRequests:      true,
 	}
 }
 
@@ -102,7 +104,7 @@ func (a *Application[RouteState]) Start() {
 	for i := int32(0); i < a.WorkerCount; i++ {
 		wg.Add(1)
 		go func() {
-			handleRequest(queue, a, (*a).Context)
+			handleRequest(queue, a, (*a).Context, i)
 			wg.Done()
 		}()
 	}
@@ -134,20 +136,34 @@ func (a *Application[RouteState]) Start() {
 	}()
 }
 
-func handleRequest[RouteState any](conn <-chan net.Conn, app *Application[RouteState], context context.Context) {
+func handlerLog(id int32, connId isnt64, ip net.Addr, msg string) {
+	log.Printf("{%d/%d} (%s): %s\n", id, connId, ip.String(), msg)
+}
+
+func handleRequest[RouteState any](conn <-chan net.Conn, app *Application[RouteState], context context.Context, id int32) {
 	db, err := (*app).Database.Acquire(context)
 	if err != nil {
 		panic(err)
 	}
-	ReqLoop: for {
+	connId := 0
+ReqLoop:
+	for {
 		select {
 		case <-context.Done():
 			db.Release()
 			return
 		case conn := <-conn:
+			connId++
+			if (*app).LogRequests {
+				handlerLog(id, connId, conn.RemoteAddr(), "Request dispatched.")
+			}
 			request := ParseRequest(&conn)
 			if request == nil {
+				handlerLog(id, connId, conn.RemoteAddr(), "Could not parse request.")
 				continue ReqLoop
+			}
+			if (*app).LogRequests {
+				handlerLog(id, connId, conn.RemoteAddr(), fmt.Sprintf("%s: '%s'", request.Method, request.Path))
 			}
 
 			response := StringResponse("")
@@ -161,11 +177,17 @@ func handleRequest[RouteState any](conn <-chan net.Conn, app *Application[RouteS
 			route := (*app).Routes.FindPath(request.Path, false)
 			if route == nil {
 				response.Write(conn)
+				if (*app).LogRequests {
+					handlerLog(id, connId, conn.RemoteAddr(), "No route found.")
+				}
 				continue ReqLoop
 			}
 			handler, found := route.Handlers[request.Method]
 			if !found {
 				response.Write(conn)
+				if (*app).LogRequests {
+					handlerLog(id, connId, conn.RemoteAddr(), "No handler found.")
+				}
 				continue ReqLoop
 			}
 
@@ -182,6 +204,7 @@ func handleRequest[RouteState any](conn <-chan net.Conn, app *Application[RouteS
 
 			response = handler.Handler(request, db, routeState)
 			if response == nil {
+				handlerLog(id, connId, conn.RemoteAddr(), "Handler returned nil, sending 500.")
 				response = StringResponse("500 Internal Server Error")
 			}
 			response.ApplyCors(&app.CorsOrigin, &app.CorsHeaders, &app.CorsMethods)
