@@ -145,7 +145,7 @@ func handleRequest[RouteState any](conn <-chan net.Conn, app *Application[RouteS
 	if err != nil {
 		panic(err)
 	}
-	connId := 0
+	var connId int64 = 0
 ReqLoop:
 	for {
 		select {
