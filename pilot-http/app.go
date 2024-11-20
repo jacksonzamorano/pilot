@@ -164,6 +164,7 @@ ReqLoop:
 			request := ParseRequest(&conn)
 			if request == nil {
 				handlerLog(id, connId, conn.RemoteAddr(), "Could not parse request.")
+				conn.Close()
 				continue ReqLoop
 			}
 			if (*app).LogRequestsLevel > 0 {
@@ -184,6 +185,7 @@ ReqLoop:
 				if (*app).LogRequestsLevel > 1 {
 					handlerLog(id, connId, conn.RemoteAddr(), "No route found.")
 				}
+				conn.Close()
 				continue ReqLoop
 			}
 			handler, found := route.Handlers[request.Method]
@@ -192,6 +194,7 @@ ReqLoop:
 				if (*app).LogRequestsLevel > 1 {
 					handlerLog(id, connId, conn.RemoteAddr(), "No handler found.")
 				}
+				conn.Close()
 				continue ReqLoop
 			}
 
@@ -202,6 +205,7 @@ ReqLoop:
 				if response != nil {
 					response.ApplyCors(&app.CorsOrigin, &app.CorsHeaders, &app.CorsMethods)
 					response.Write(conn)
+					conn.Close()
 					continue ReqLoop
 				}
 			}
@@ -213,6 +217,7 @@ ReqLoop:
 			}
 			response.ApplyCors(&app.CorsOrigin, &app.CorsHeaders, &app.CorsMethods)
 			response.Write(conn)
+			conn.Close()
 		}
 	}
 }
