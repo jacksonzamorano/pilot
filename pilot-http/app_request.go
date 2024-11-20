@@ -111,12 +111,12 @@ func ParseRequest(incoming *net.Conn) *HttpRequest {
 	if err != nil {
 		return nil
 	}
-	req.Method = HttpMethods[string(bytes)]
+	req.Method = HttpMethods[string(bytes[:len(bytes)-1])]
 	bytes, err = bufReader.ReadBytes(' ')
 	if err != nil {
 		return nil
 	}
-	req.Path = string(bytes)
+	req.Path = string(bytes[:len(bytes)-1])
 	bytes, err = bufReader.ReadBytes(' ')
 	if err != nil {
 		log.Println(err)
