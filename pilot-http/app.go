@@ -136,7 +136,7 @@ func (a *Application[RouteState]) Start() {
 	}()
 }
 
-func handlerLog(id int32, connId isnt64, ip net.Addr, msg string) {
+func handlerLog(id int32, connId int64, ip net.Addr, msg string) {
 	log.Printf("{%d/%d} (%s): %s\n", id, connId, ip.String(), msg)
 }
 
