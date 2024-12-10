@@ -173,7 +173,7 @@ ReqLoop:
 
 			if request.Method == Options {
 				response := HttpResponse{
-					StatusCode: StatusNoContent,
+					StatusCode: StatusOK,
 					Body:       []byte{},
 					Headers: map[string]string{
 						"Access-Control-Allow-Origin":  (*app).CorsOrigin,
