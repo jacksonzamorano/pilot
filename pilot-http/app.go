@@ -171,14 +171,23 @@ ReqLoop:
 				handlerLog(id, connId, conn.RemoteAddr(), fmt.Sprintf("%s: '%s'", request.Method, request.Path))
 			}
 
+			if request.Method == Options {
+				response := HttpResponse{
+					StatusCode: StatusNoContent,
+					Body:       []byte{},
+					Headers: map[string]string{
+						"Access-Control-Allow-Origin":  (*app).CorsOrigin,
+						"Access-Control-Allow-Headers": (*app).CorsHeaders,
+						"Access-Control-Allow-Methods": (*app).CorsMethods,
+					},
+				}
+				response.Write(conn)
+				continue ReqLoop
+			}
 			response := StringResponse("")
 			response.Body = []byte("404 not found")
 			response.SetStatus(StatusNotFound)
 			response.ApplyCors(&app.CorsOrigin, &app.CorsHeaders, &app.CorsMethods)
-			if request.Method == Options {
-				response.Write(conn)
-				continue ReqLoop
-			}
 			route := (*app).Routes.FindPath(request.Path, false)
 			if route == nil {
 				response.Write(conn)
