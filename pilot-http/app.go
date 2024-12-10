@@ -182,6 +182,7 @@ ReqLoop:
 					},
 				}
 				response.Write(conn)
+				conn.Close()
 				continue ReqLoop
 			}
 			response := StringResponse("")
