@@ -3,6 +3,7 @@ package pilot_http
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"net/url"
@@ -98,7 +99,7 @@ func (req *HttpRequest) Dump() {
 }
 
 func ParseRequest(incoming *net.Conn) *HttpRequest {
-	(*incoming).SetReadDeadline(time.Now().Add(time.Second * 5))
+	(*incoming).SetReadDeadline(time.Now().Add(time.Second * 10))
 	req := HttpRequest{
 		Path:        "",
 		Method:      "",
@@ -149,7 +150,7 @@ func ParseRequest(incoming *net.Conn) *HttpRequest {
 	if req.Headers["Content-Length"] != "" {
 		bodyLength, _ := strconv.Atoi(req.Headers["Content-Length"])
 		body := make([]byte, bodyLength)
-		_, err = bufReader.Read(body)
+		_, err = io.ReadFull(bufReader, body)
 		if err != nil {
 			return nil
 		}

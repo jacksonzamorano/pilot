@@ -330,6 +330,10 @@ func (b *QueryBuilder[T]) Context(table string) *QueryBuilder[T] {
 	}
 	return b
 }
+func (b *QueryBuilder[T]) Base() *QueryBuilder[T] {
+	b.lastJoin = nil
+	return b
+}
 func (b *QueryBuilder[T]) Force() *QueryBuilder[T] {
 	b.warn = false
 	return b
@@ -358,10 +362,10 @@ func (b *QueryBuilder[T]) joinToString() string {
 	var query string
 	for _, join := range b.joins {
 		query += join.joinKind + " " + join.table + " " + join.alias + " ON " + join.where
-		query += ", "
+		query += " "
 	}
-	if len(query) > 2 {
-		return query[:len(query)-2]
+	if len(query) > 1 {
+		return query[:len(query)-1]
 	} else {
 		return query
 	}

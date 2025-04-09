@@ -9,8 +9,8 @@ import (
 )
 
 type genericResponse struct {
-	Status bool   `json:"status"`
-	Error  string `json:"error"`
+	Status  bool   `json:"status"`
+	Message string `json:"message"`
 }
 
 type HttpResponse struct {
@@ -30,8 +30,8 @@ func StringResponse(body string) *HttpResponse {
 }
 func ErrorResponse(body error) *HttpResponse {
 	errorResponse := genericResponse{
-		Status: false,
-		Error:  body.Error(),
+		Status:  false,
+		Message: body.Error(),
 	}
 	json, _ := json.Marshal(errorResponse)
 	res := NewHttpResponse()
@@ -42,16 +42,16 @@ func ErrorResponse(body error) *HttpResponse {
 }
 func BadRequestResponse(message string) *HttpResponse {
 	res := JsonResponse(genericResponse{
-		Status: false,
-		Error:  message,
+		Status:  false,
+		Message: message,
 	})
 	res.StatusCode = StatusBadRequest
 	return res
 }
 func ErrorMessageResponse(body string) *HttpResponse {
 	errorResponse := genericResponse{
-		Status: false,
-		Error:  body,
+		Status:  false,
+		Message: body,
 	}
 	json, _ := json.Marshal(errorResponse)
 	res := NewHttpResponse()
@@ -62,24 +62,24 @@ func ErrorMessageResponse(body string) *HttpResponse {
 }
 func ForbiddenResponse(message string) *HttpResponse {
 	res := JsonResponse(genericResponse{
-		Status: false,
-		Error:  message,
+		Status:  false,
+		Message: message,
 	})
 	res.StatusCode = StatusForbidden
 	return res
 }
 func NotFoundResponse(err string) *HttpResponse {
 	res := JsonResponse(genericResponse{
-		Status: false,
-		Error:  err,
+		Status:  false,
+		Message: err,
 	})
 	res.StatusCode = StatusNotFound
 	return res
 }
 func DtoErrorResponse(body error) *HttpResponse {
 	errorResponse := genericResponse{
-		Status: false,
-		Error:  body.Error(),
+		Status:  false,
+		Message: body.Error(),
 	}
 	json, _ := json.Marshal(errorResponse)
 	res := NewHttpResponse()
@@ -90,8 +90,8 @@ func DtoErrorResponse(body error) *HttpResponse {
 }
 func SuccessStringResponse(message string) *HttpResponse {
 	return JsonResponse(genericResponse{
-		Status: true,
-		Error:  message,
+		Status:  true,
+		Message: message,
 	})
 }
 func JsonResponse(body interface{}) *HttpResponse {
