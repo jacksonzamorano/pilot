@@ -1,3 +1,34 @@
+// Package pilot_db provides a fluent, type-safe PostgreSQL query builder with comprehensive CRUD operations,
+// transaction support, and seamless integration with pgx connection pools. This package offers an intuitive
+// API for building complex SQL queries programmatically while maintaining type safety and preventing common
+// SQL injection vulnerabilities through proper parameter binding.
+//
+// Key Features:
+// - Fluent API for building SELECT, INSERT, UPDATE, and DELETE queries
+// - Type-safe query construction with generics support
+// - Automatic parameter binding to prevent SQL injection
+// - Support for complex joins, subqueries, and aggregations
+// - Transaction management with bulk operations
+// - Comprehensive error handling with custom error types
+// - Integration with pilot_http for automatic HTTP response generation
+//
+// The query builder supports all major SQL operations including:
+// - Field selection with aliasing and expressions
+// - WHERE clauses with multiple operators (=, <>, <, <=, >, >=, LIKE, IN, IS NULL, etc.)
+// - INNER JOINs with custom aliases and conditions
+// - ORDER BY clauses with multiple fields and directions
+// - GROUP BY operations for aggregations
+// - LIMIT clauses for result pagination
+// - Bulk insert operations for improved performance
+//
+// Usage Example:
+//   query := pilot_db.Select("users", userFromRow).
+//       Select("id").Select("name").Select("email").
+//       Where("active", "= $", true).
+//       SortDesc("created_at").
+//       Limit(10)
+//   
+//   users, err := query.QueryMany(ctx, conn)
 package pilot_db
 
 import (
@@ -15,13 +46,32 @@ import (
 	"golang.org/x/text/language"
 )
 
+// NoRowError represents an error that occurs when a database operation expects to find data
+// but no rows are returned. This is typically used internally by the query builder to
+// distinguish between actual errors and simply empty result sets.
 type NoRowError struct {
 }
 
+// Error implements the error interface for NoRowError, providing a human-readable
+// error message indicating that no data was found during the database operation.
 func (e NoRowError) Error() string {
 	return "No data found"
 }
 
+// BeginTransaction starts a new PostgreSQL transaction using the provided connection pool.
+// This function creates a transaction context that can be used for multiple related database
+// operations that need to be executed atomically. If the transaction cannot be started,
+// the function will panic with the underlying error.
+//
+// Parameters:
+//   - conn: A connection from the pgx connection pool
+//
+// Returns:
+//   - *pgx.Tx: A pointer to the transaction object that can be used for subsequent operations
+//
+// Usage:
+//   tx := pilot_db.BeginTransaction(conn)
+//   defer pilot_db.EndTransaction(*tx) // Remember to commit or rollback
 func BeginTransaction(conn *pgxpool.Conn) *pgx.Tx {
 	tx, err := conn.Begin(context.Background())
 	if err != nil {
@@ -29,12 +79,86 @@ func BeginTransaction(conn *pgxpool.Conn) *pgx.Tx {
 	}
 	return &tx
 }
+
+// EndTransaction commits a PostgreSQL transaction, making all changes within the transaction
+// permanent. This function should be called after all operations within a transaction are
+// complete and successful. If any operation within the transaction failed, you should call
+// tx.Rollback() instead to undo all changes.
+//
+// Parameters:
+//   - tx: The transaction to commit
+//
+// Returns:
+//   - error: Any error that occurred during the commit operation
+//
+// Usage:
+//   err := pilot_db.EndTransaction(tx)
+//   if err != nil {
+//       log.Printf("Failed to commit transaction: %v", err)
+//   }
 func EndTransaction(tx pgx.Tx) error {
 	return tx.Commit(context.Background())
 }
 
+// FromTableFn is a generic function type that defines how to convert a database row
+// into a Go struct or type. This function is used by the query builder to automatically
+// parse query results into the desired type T. The function should read the appropriate
+// columns from the pgx.Rows object and populate a struct of type T.
+//
+// Type Parameters:
+//   - T: The target type to convert database rows into
+//
+// Parameters:
+//   - row: A pgx.Rows object positioned at the current row to be converted
+//
+// Returns:
+//   - *T: A pointer to the converted object of type T
+//   - error: Any error that occurred during the conversion process
+//
+// Example:
+//   func userFromRow(row pgx.Rows) (*User, error) {
+//       var user User
+//       err := row.Scan(&user.ID, &user.Name, &user.Email, &user.CreatedAt)
+//       return &user, err
+//   }
 type FromTableFn[T any] func(row pgx.Rows) (*T, error)
 
+// QueryBuilder is the core struct that represents a SQL query being constructed.
+// It uses a fluent API pattern where methods can be chained together to build
+// complex queries. The builder is generic over type T, which represents the target
+// type that query results will be converted into.
+//
+// The QueryBuilder supports all major SQL operations:
+// - SELECT queries with field selection, joins, filtering, sorting, and pagination
+// - INSERT queries with single or bulk record insertion
+// - UPDATE queries with conditional updates and field modifications
+// - DELETE queries with conditional record removal
+//
+// Type Parameters:
+//   - T: The target type for query results (e.g., User, Product, etc.)
+//
+// Fields:
+//   - operation: The SQL operation type ("SELECT", "INSERT", "UPDATE", "DELETE")
+//   - fields: List of fields to select in the query
+//   - from: The primary table name for the query
+//   - joins: List of JOIN clauses to include in the query
+//   - lastJoin: Reference to the most recently added join for context switching
+//   - where: List of WHERE conditions to filter results
+//   - set: List of field assignments for INSERT/UPDATE operations
+//   - joinsByName: Map of join aliases to join objects for easy reference
+//   - conversion: Function to convert database rows to type T
+//   - warn: Whether to show warnings for potentially dangerous operations
+//   - sort: List of ORDER BY clauses for result sorting
+//   - limit: Maximum number of results to return (-1 for no limit)
+//   - groupBy: Optional GROUP BY clause for aggregations
+//
+// Example:
+//   // Create a new query builder for User objects
+//   query := pilot_db.Select("users", userFromRow).
+//       Select("id").Select("name").Select("email").
+//       Where("active", "= $", true).
+//       SortDesc("created_at").
+//       Limit(10)
 type QueryBuilder[T any] struct {
 	operation   string
 	fields      []SelectField
@@ -51,6 +175,28 @@ type QueryBuilder[T any] struct {
 	groupBy     *string
 }
 
+// Select creates a new QueryBuilder configured for SELECT operations on the specified table.
+// This is the primary constructor for building queries that retrieve data from the database.
+// The returned QueryBuilder can be further configured with field selections, joins, where
+// clauses, sorting, and pagination using the fluent API.
+//
+// Type Parameters:
+//   - T: The target type that query results will be converted into
+//
+// Parameters:
+//   - table: The name of the primary table to select from
+//   - conversion: A function that converts database rows into objects of type T
+//
+// Returns:
+//   - *QueryBuilder[T]: A new QueryBuilder configured for SELECT operations
+//
+// Example:
+//   // Create a SELECT query for users
+//   query := pilot_db.Select("users", userFromRow).
+//       Select("id").Select("name").Select("email").
+//       Where("active", "= $", true)
+//   
+//   users, err := query.QueryMany(ctx, conn)
 func Select[T any](table string, conversion FromTableFn[T]) *QueryBuilder[T] {
 	return &QueryBuilder[T]{
 		operation:   "SELECT",
@@ -67,6 +213,29 @@ func Select[T any](table string, conversion FromTableFn[T]) *QueryBuilder[T] {
 		limit:       -1,
 	}
 }
+
+// Update creates a new QueryBuilder configured for UPDATE operations on the specified table.
+// This constructor is used to build queries that modify existing records in the database.
+// You must use the Set() method to specify which fields to update before executing the query.
+//
+// Type Parameters:
+//   - T: The target type that query results will be converted into (for RETURNING clauses)
+//
+// Parameters:
+//   - table: The name of the table to update records in
+//   - conversion: A function that converts database rows into objects of type T
+//
+// Returns:
+//   - *QueryBuilder[T]: A new QueryBuilder configured for UPDATE operations
+//
+// Example:
+//   // Create an UPDATE query to modify user records
+//   query := pilot_db.Update("users", userFromRow).
+//       Set("name", "John Doe").
+//       Set("updated_at", time.Now()).
+//       Where("id", "= $", 123)
+//   
+//   err := query.QueryInTransaction(ctx, tx)
 func Update[T any](table string, conversion FromTableFn[T]) *QueryBuilder[T] {
 	return &QueryBuilder[T]{
 		operation:   "UPDATE",
@@ -83,6 +252,35 @@ func Update[T any](table string, conversion FromTableFn[T]) *QueryBuilder[T] {
 		limit:       -1,
 	}
 }
+
+// Insert creates a new QueryBuilder configured for INSERT operations on the specified table.
+// This constructor is used to build queries that add new records to the database. You can
+// insert single records using Set() calls, or perform bulk inserts by calling Set() multiple
+// times with the same field names to create multiple rows.
+//
+// Type Parameters:
+//   - T: The target type that query results will be converted into (for RETURNING clauses)
+//
+// Parameters:
+//   - table: The name of the table to insert records into
+//   - conversion: A function that converts database rows into objects of type T
+//
+// Returns:
+//   - *QueryBuilder[T]: A new QueryBuilder configured for INSERT operations
+//
+// Example:
+//   // Create an INSERT query for a new user
+//   query := pilot_db.Insert("users", userFromRow).
+//       Set("name", "Jane Doe").
+//       Set("email", "jane@example.com").
+//       Set("created_at", time.Now())
+//   
+//   newUser, err := query.QueryOneExpect(ctx, conn)
+//
+//   // Bulk insert example
+//   bulkQuery := pilot_db.Insert("users", userFromRow).
+//       Set("name", "User 1").Set("email", "user1@example.com").  // First row
+//       Set("name", "User 2").Set("email", "user2@example.com")   // Second row
 func Insert[T any](table string, conversion FromTableFn[T]) *QueryBuilder[T] {
 	return &QueryBuilder[T]{
 		operation:   "INSERT",
@@ -99,6 +297,33 @@ func Insert[T any](table string, conversion FromTableFn[T]) *QueryBuilder[T] {
 		limit:       -1,
 	}
 }
+
+// Delete creates a new QueryBuilder configured for DELETE operations on the specified table.
+// This constructor is used to build queries that remove records from the database. For safety,
+// DELETE queries require at least one WHERE clause unless you explicitly call Force() to
+// override this protection against accidental mass deletions.
+//
+// Type Parameters:
+//   - T: The target type that query results will be converted into (for RETURNING clauses)
+//
+// Parameters:
+//   - table: The name of the table to delete records from
+//   - conversion: A function that converts database rows into objects of type T
+//
+// Returns:
+//   - *QueryBuilder[T]: A new QueryBuilder configured for DELETE operations
+//
+// Example:
+//   // Create a DELETE query to remove inactive users
+//   query := pilot_db.Delete("users", userFromRow).
+//       Where("active", "= $", false).
+//       Where("last_login", "< $", cutoffDate)
+//   
+//   err := query.QueryInTransaction(ctx, tx)
+//
+//   // Force delete all records (dangerous!)
+//   query := pilot_db.Delete("temp_data", tempDataFromRow).
+//       Force()  // Required to delete without WHERE clause
 func Delete[T any](table string, conversion FromTableFn[T]) *QueryBuilder[T] {
 	return &QueryBuilder[T]{
 		operation:   "DELETE",
@@ -115,6 +340,36 @@ func Delete[T any](table string, conversion FromTableFn[T]) *QueryBuilder[T] {
 		limit:       -1,
 	}
 }
+// Set assigns a value to a field for INSERT or UPDATE operations. This method uses parameter
+// binding to safely include values in the query, preventing SQL injection attacks. For INSERT
+// operations, calling Set multiple times with the same field name creates multiple rows for
+// bulk insertion. For UPDATE operations, subsequent calls to Set with the same field will
+// override the previous value.
+//
+// Parameters:
+//   - field: The name of the database column to set
+//   - value: The value to assign to the field (will be parameter-bound)
+//
+// Returns:
+//   - *QueryBuilder[T]: The QueryBuilder instance for method chaining
+//
+// Example:
+//   // Single INSERT
+//   query := pilot_db.Insert("users", userFromRow).
+//       Set("name", "John Doe").
+//       Set("email", "john@example.com").
+//       Set("age", 30)
+//
+//   // Bulk INSERT (multiple rows)
+//   query := pilot_db.Insert("users", userFromRow).
+//       Set("name", "John").Set("email", "john@example.com").     // Row 1
+//       Set("name", "Jane").Set("email", "jane@example.com")      // Row 2
+//
+//   // UPDATE operation
+//   query := pilot_db.Update("users", userFromRow).
+//       Set("name", "Updated Name").
+//       Set("updated_at", time.Now()).
+//       Where("id", "= $", userId)
 func (b *QueryBuilder[T]) Set(field string, value any) *QueryBuilder[T] {
 	if b.operation != "UPDATE" && b.operation != "INSERT" {
 		log.Fatal("Attempted to set a field on a non-update/insert query. This is probably not what you want.")
@@ -140,6 +395,31 @@ func (b *QueryBuilder[T]) Set(field string, value any) *QueryBuilder[T] {
 	}
 	return b
 }
+
+// SetLiteral assigns a literal SQL expression to a field for UPDATE operations. Unlike Set(),
+// this method does not use parameter binding and inserts the value directly into the SQL.
+// This is useful for database functions, calculations, or other SQL expressions that need
+// to be evaluated by the database engine. Use with caution as this bypasses SQL injection
+// protection - only use with trusted input or database functions.
+//
+// Parameters:
+//   - field: The name of the database column to set
+//   - value: The literal SQL expression to assign (not parameter-bound)
+//
+// Returns:
+//   - *QueryBuilder[T]: The QueryBuilder instance for method chaining
+//
+// Example:
+//   // Using database functions
+//   query := pilot_db.Update("users", userFromRow).
+//       SetLiteral("updated_at", "NOW()").
+//       SetLiteral("login_count", "login_count + 1").
+//       Where("id", "= $", userId)
+//
+//   // Using calculations
+//   query := pilot_db.Update("products", productFromRow).
+//       SetLiteral("price", "price * 1.1").  // 10% price increase
+//       Where("category", "= $", "electronics")
 func (b *QueryBuilder[T]) SetLiteral(field string, value string) *QueryBuilder[T] {
 	if b.operation != "UPDATE" {
 		log.Fatal("Attempted to set a field using literal syntax on a non-update query. This is probably not what you want.")
@@ -165,6 +445,28 @@ func (b *QueryBuilder[T]) SetLiteral(field string, value string) *QueryBuilder[T
 	}
 	return b
 }
+// Select adds a field to the SELECT clause of the query. The field will be selected from
+// the current context table (either the base table or the most recently joined table).
+// This method is context-aware and will automatically use the appropriate table alias
+// based on the current query context set by Context() or the most recent join operation.
+//
+// Parameters:
+//   - field: The name of the database column to select
+//
+// Returns:
+//   - *QueryBuilder[T]: The QueryBuilder instance for method chaining
+//
+// Example:
+//   query := pilot_db.Select("users", userFromRow).
+//       Select("id").
+//       Select("name").
+//       Select("email")
+//
+//   // With joins and context switching
+//   query := pilot_db.Select("users", userFromRow).
+//       Select("id").Select("name").          // From users table
+//       InnerJoin("profiles", "id", "user_id").
+//       Select("bio").Select("avatar_url")    // From profiles table (current context)
 func (b *QueryBuilder[T]) Select(field string) *QueryBuilder[T] {
 	if b.lastJoin != nil {
 		b.fields = append(b.fields, SelectField{field, b.lastJoin.alias, field, nil})
@@ -173,6 +475,24 @@ func (b *QueryBuilder[T]) Select(field string) *QueryBuilder[T] {
 	}
 	return b
 }
+
+// SelectAs adds a field to the SELECT clause with a custom alias. This is useful when you
+// need to rename columns in the result set or when dealing with name conflicts between
+// joined tables. The field will be selected from the current context table.
+//
+// Parameters:
+//   - field: The name of the database column to select
+//   - as: The alias to use for this field in the result set
+//
+// Returns:
+//   - *QueryBuilder[T]: The QueryBuilder instance for method chaining
+//
+// Example:
+//   query := pilot_db.Select("users", userFromRow).
+//       SelectAs("name", "user_name").
+//       SelectAs("created_at", "signup_date").
+//       InnerJoin("companies", "company_id", "id").
+//       SelectAs("name", "company_name")  // Avoids conflict with users.name
 func (b *QueryBuilder[T]) SelectAs(field string, as string) *QueryBuilder[T] {
 	if b.lastJoin != nil {
 		b.fields = append(b.fields, SelectField{field, b.lastJoin.alias, as, nil})
@@ -181,14 +501,68 @@ func (b *QueryBuilder[T]) SelectAs(field string, as string) *QueryBuilder[T] {
 	}
 	return b
 }
+
+// SelectExprFromBase adds a SQL expression to the SELECT clause using the base table context.
+// This method allows you to use database functions, calculations, or other SQL expressions
+// in your query results. The expression is not parameter-bound, so use with caution.
+//
+// Parameters:
+//   - field: The alias name for the expression result
+//   - expr: The SQL expression to evaluate
+//
+// Returns:
+//   - *QueryBuilder[T]: The QueryBuilder instance for method chaining
+//
+// Example:
+//   query := pilot_db.Select("users", userFromRow).
+//       Select("name").
+//       SelectExprFromBase("age_years", "EXTRACT(YEAR FROM AGE(birth_date))").
+//       SelectExprFromBase("full_name", "CONCAT(first_name, ' ', last_name)")
 func (b *QueryBuilder[T]) SelectExprFromBase(field string, expr string) *QueryBuilder[T] {
 	b.fields = append(b.fields, SelectField{field, b.from, "", &expr})
 	return b
 }
+
+// SelectFromBaseAs adds a field from the base table with a custom alias, regardless of the
+// current context. This is useful when you've joined to other tables but need to explicitly
+// select a field from the primary table with a specific alias.
+//
+// Parameters:
+//   - field: The name of the database column to select from the base table
+//   - as: The alias to use for this field in the result set
+//
+// Returns:
+//   - *QueryBuilder[T]: The QueryBuilder instance for method chaining
+//
+// Example:
+//   query := pilot_db.Select("users", userFromRow).
+//       InnerJoin("profiles", "id", "user_id").
+//       Select("bio").                              // From profiles (current context)
+//       SelectFromBaseAs("name", "user_name")       // Explicitly from users table
 func (b *QueryBuilder[T]) SelectFromBaseAs(field string, as string) *QueryBuilder[T] {
 	b.fields = append(b.fields, SelectField{field, b.from, as, nil})
 	return b
 }
+
+// SelectFromAs adds a field from a specific joined table with a custom alias. This method
+// allows you to explicitly specify which joined table to select from using the join's alias,
+// providing full control over field selection in complex multi-table queries.
+//
+// Parameters:
+//   - field: The name of the database column to select
+//   - from: The alias of the joined table to select from
+//   - as: The alias to use for this field in the result set
+//
+// Returns:
+//   - *QueryBuilder[T]: The QueryBuilder instance for method chaining
+//
+// Example:
+//   query := pilot_db.Select("users", userFromRow).
+//       InnerJoinAs("profiles", "user_profiles", "id", "user_id").
+//       InnerJoinAs("companies", "user_companies", "company_id", "id").
+//       Select("name").                                           // From users
+//       SelectFromAs("bio", "user_profiles", "profile_bio").      // From profiles
+//       SelectFromAs("name", "user_companies", "company_name")    // From companies
 func (b *QueryBuilder[T]) SelectFromAs(field string, from string, as string) *QueryBuilder[T] {
 	join, ok := b.joinsByName[from]
 	if !ok {
@@ -510,18 +884,17 @@ func (b QueryBuilder[T]) BuildOffset(idx int, selectResults bool) (string, []any
 func (builder *QueryBuilder[T]) QueryOneExpect(ctx context.Context, conn *pgxpool.Conn) (*T, *QueryBuilderError) {
 	query, args := builder.Build()
 	rows, err := (*conn).Query(ctx, query, args...)
-	defer rows.Close()
 	if err != nil {
 		return nil, PostgresError(builder.from, err)
 	}
-	for rows.Next() {
+	defer rows.Close()
+	if rows.Next() {
 		value, err := builder.conversion(rows)
 		if err != nil {
 			return nil, PostgresError(builder.from, err)
 		}
 		return value, nil
 	}
-	rows.Close()
 	if rows.Err() != nil {
 		return nil, PostgresError(builder.from, rows.Err())
 	}
@@ -530,18 +903,17 @@ func (builder *QueryBuilder[T]) QueryOneExpect(ctx context.Context, conn *pgxpoo
 func (builder *QueryBuilder[T]) QueryOne(ctx context.Context, conn *pgxpool.Conn) (*T, *QueryBuilderError) {
 	query, args := builder.Build()
 	rows, err := (*conn).Query(ctx, query, args...)
-	defer rows.Close()
 	if err != nil {
 		return nil, PostgresError(builder.from, err)
 	}
-	for rows.Next() {
+	defer rows.Close()
+	if rows.Next() {
 		value, err := builder.conversion(rows)
 		if err != nil {
 			return nil, PostgresError(builder.from, err)
 		}
 		return value, nil
 	}
-	rows.Close()
 	if rows.Err() != nil {
 		return nil, PostgresError(builder.from, rows.Err())
 	}
@@ -551,10 +923,10 @@ func (builder *QueryBuilder[T]) QueryMany(ctx context.Context, conn *pgxpool.Con
 	results := []T{}
 	query, args := builder.Build()
 	rows, err := (*conn).Query(ctx, query, args...)
-	defer rows.Close()
 	if err != nil {
 		return &results, PostgresError(builder.from, err)
 	}
+	defer rows.Close()
 	for rows.Next() {
 		value, err := builder.conversion(rows)
 		if err != nil {
@@ -571,10 +943,10 @@ func (builder *QueryBuilder[T]) QueryMany(ctx context.Context, conn *pgxpool.Con
 func (builder *QueryBuilder[T]) QueryInTransaction(ctx context.Context, tx *pgx.Tx) *QueryBuilderError {
 	query, args := builder.Build()
 	rows, err := (*tx).Query(ctx, query, args...)
-	defer rows.Close()
 	if err != nil {
 		return PostgresError(builder.from, err)
 	}
+	defer rows.Close()
 	return nil
 }
 
@@ -691,8 +1063,8 @@ type QuerySort struct {
 type PostgresErrorCode string
 
 const (
-	PostgresErrorCodeUniqueViolation PostgresErrorCode = "23505"
-	PostgresErrorCodeNotNullViolation PostgresErrorCode = "23502"
+	PostgresErrorCodeUniqueViolation     PostgresErrorCode = "23505"
+	PostgresErrorCodeNotNullViolation    PostgresErrorCode = "23502"
 	PostgresErrorCodeForeignKeyViolation PostgresErrorCode = "23503"
-	PostgresErrorCodeCheckViolation PostgresErrorCode = "23514"
+	PostgresErrorCodeCheckViolation      PostgresErrorCode = "23514"
 )

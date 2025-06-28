@@ -1,0 +1,157 @@
+[meta id]pilot[/meta]
+[meta name]Go Pilot[/meta]
+
+[define int32]int32[/define]
+[define int64]int64[/define]
+[define float64]float64[/define]
+[define string]string[/define]
+[define uuid]uuid.UUID[/define]
+[define boolean]bool[/define]
+[define datetime]time.Time[/define]
+[link uuid]import "github.com/google/uuid"[/link]
+[link datetime]import "time"[/link]
+
+[file]model.go[/file]
+package [package];
+
+[imports]
+import (
+	"fmt"
+	"github.com/jackc/pgx/v5"
+	"github.com/jacksonzamorano/pilot/pilot-db"
+	"github.com/jacksonzamorano/pilot/pilot-json"
+)
+
+
+[each enum]
+type [name] string
+
+const (
+	[each case][br]
+	[enum_name][name] [enum_name] = "[value]"
+	[/each][br]
+)
+[/each]
+
+[each object][br]
+const (
+	[each field][br]
+	[object_name]Key[name.titlecase] = "[name]"
+	[/each][br]
+)
+
+type [name] struct {
+	[each field][br]
+	[name.titlecase] [if optional]*[/if][if array]\[][/if][type] `json:"[name]"`
+	[/each][br]
+}
+
+func [name]FromJson(data *[]byte) (*[name], *pilot_json.JsonFieldError) {
+	json := pilot_json.NewJsonObject()
+	var output [name][br]
+	if err := json.Parse(data); err != nil {
+		return nil, pilot_json.CouldNotParseError("")
+	}
+	[each field]
+
+	[ifn array]
+	[if custom][br]
+	_[name.titlecase]Data, err := json.GetData("[name]")
+	[ifn optional][br]
+	if err != nil {
+		return nil, err;
+	}
+	[/ifn][br]
+	_[name.titlecase], err := [type]FromJson(_[name.titlecase]Data)[br]
+	if err != nil {
+		err.AddPath("[name]")
+		return nil, err
+	}
+	[/if]
+
+	[ifn custom][br]
+	_[name.titlecase], err := json.Get[type.split_period_last.titlecase]("[name]")[br]
+	[ifn optional][br]
+	if err != nil {
+		return nil, err
+	}
+	[/ifn]
+	[/ifn]
+	[if optional][br]
+	output.[name.titlecase] = *_[name.titlecase]
+	[/if]
+	[ifn optional][br]
+	output.[name.titlecase] = *_[name.titlecase]
+	[/ifn]
+	[/ifn]
+
+	[if array][br]
+	_[name.titlecase]Arr, err := json.GetArray("[name]")[br]
+	if err != nil && !false {
+		return nil, err
+	}
+	if _[name.titlecase]Arr != nil {[br]
+		[if custom]
+		_[name.titlecase] := [][type]{};
+		for _idx := range _[name.titlecase]Arr.Length() {
+			__[name.titlecase]__, err := _[name.titlecase]Arr.GetData(_idx);
+			if err != nil {
+				err.AddPath(fmt.Sprintf("%v", _idx))
+				err.AddPath("[name]")
+				return nil, err
+			}
+			_[name.titlecase]_, err := [type]FromJson(__[name.titlecase]__)
+			if err != nil {
+				err.AddPath(fmt.Sprintf("%v", _idx))
+				err.AddPath("[name]")
+				return nil, err
+			}
+			_[name.titlecase] = append(_[name.titlecase], *_[name.titlecase]_)
+		}
+		[/if][br]
+		[ifn custom]
+		NOT CUSTOM
+		[/ifn]
+	}
+	[/each][br]
+
+	return &output, nil
+}
+
+[ifn struct][br]
+func [name]FromTable(row pgx.Rows) (*[name], error) {
+	var obj [name][br]
+	if err := row.Scan([each field]&obj.[name.titlecase][if sep], [/if][/each]); err != nil {
+		return &obj, err
+	}
+	return &obj, nil
+}
+func Select[name]() *pilot_db.QueryBuilder\[[name]] {
+	return pilot_db.Select("[table_name]", [name]FromTable)
+	[each join].InnerJoinAs("[ref_table]", "[name]", "[local_field]", "[ref_field]")[/each]
+	[each field][if local].SelectFromBaseAs("[name]", "[name]")[/if][ifn local].SelectFromAs("[ref_field]", "[ref_table]", "[name]")[/ifn][/each]
+	[br]
+}
+[/ifn]
+[if record][br]
+func Insert[name]() *pilot_db.QueryBuilder\[[name]] {
+	return pilot_db.Insert("[table_name]", [name]FromTable)
+	[each join].InnerJoinAs("[ref_table]", "[name]", "[local_field]", "[ref_field]")[/each]
+	[each field][if local].SelectFromBaseAs("[name]", "[name]")[/if][ifn local].SelectFromAs("[ref_field]", "[ref_table]", "[name]")[/ifn][/each]
+	[br]
+}
+func Update[name]() *pilot_db.QueryBuilder\[[name]] {
+	return pilot_db.Update("[table_name]", [name]FromTable)
+	[each join].InnerJoinAs("[ref_table]", "[name]", "[local_field]", "[ref_field]")[/each]
+	[each field][if local].SelectFromBaseAs("[name]", "[name]")[/if][ifn local].SelectFromAs("[ref_field]", "[ref_table]", "[name]")[/ifn][/each]
+	[br]
+} 
+func Delete[name]() *pilot_db.QueryBuilder\[[name]] {
+	return pilot_db.Delete("[table_name]", [name]FromTable)
+	[each join].InnerJoinAs("[ref_table]", "[name]", "[local_field]", "[ref_field]")[/each]
+	[each field][if local].SelectFromBaseAs("[name]", "[name]")[/if][ifn local].SelectFromAs("[ref_field]", "[ref_table]", "[name]")[/ifn][/each]
+	[br]
+}
+[/ifn]
+
+[/each]
