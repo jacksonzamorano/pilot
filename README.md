@@ -2,6 +2,8 @@
 
 Pilot is a batteries-included, high-performance HTTP framework for Go that provides everything you need to build robust web applications and APIs. The framework is designed around four core packages that work seamlessly together to handle common backend development tasks with minimal boilerplate and maximum type safety.
 
+A Repack blueprint file is provided, if you already use [Repack](https://github.com/jacksonzamorano/repack), my codegen tool.
+
 ## 🚀 Key Features
 
 - **Type-Safe Database Operations**: Fluent PostgreSQL query builder with generics support
