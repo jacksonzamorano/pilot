@@ -55,12 +55,13 @@ import (
 //   - error: Returns an error if the input is not a valid JSON object
 //
 // Example:
-//   jsonData := []byte(`{"name":"John","age":30,"active":true}`)
-//   obj := pilot_json.NewJsonObject()
-//   err := obj.Parse(&jsonData)
-//   if err != nil {
-//       log.Printf("Failed to parse JSON: %v", err)
-//   }
+//
+//	jsonData := []byte(`{"name":"John","age":30,"active":true}`)
+//	obj := pilot_json.NewJsonObject()
+//	err := obj.Parse(&jsonData)
+//	if err != nil {
+//	    log.Printf("Failed to parse JSON: %v", err)
+//	}
 func (this *JsonObject) Parse(json *[]byte) error {
 	if len(*json) == 0 {
 		return nil
@@ -126,14 +127,15 @@ func (this *JsonObject) Parse(json *[]byte) error {
 //   - data: Internal map storing field names as keys and raw JSON bytes as values
 //
 // Example:
-//   obj := pilot_json.NewJsonObject()
-//   err := obj.Parse(&jsonBytes)
-//   
-//   // Type-safe field access with error handling
-//   name, err := obj.GetString("name")
-//   if err != nil {
-//       // Handle missing or invalid field
-//   }
+//
+//	obj := pilot_json.NewJsonObject()
+//	err := obj.Parse(&jsonBytes)
+//
+//	// Type-safe field access with error handling
+//	name, err := obj.GetString("name")
+//	if err != nil {
+//	    // Handle missing or invalid field
+//	}
 type JsonObject struct {
 	data map[string][]byte
 }
@@ -146,11 +148,12 @@ type JsonObject struct {
 //   - *JsonObject: A new, empty JsonObject ready for parsing
 //
 // Example:
-//   obj := pilot_json.NewJsonObject()
-//   err := obj.Parse(&jsonData)
-//   
-//   // Now you can access fields from the parsed JSON
-//   username, err := obj.GetString("username")
+//
+//	obj := pilot_json.NewJsonObject()
+//	err := obj.Parse(&jsonData)
+//
+//	// Now you can access fields from the parsed JSON
+//	username, err := obj.GetString("username")
 func NewJsonObject() *JsonObject {
 	return &JsonObject{
 		data: make(map[string][]byte),
@@ -283,12 +286,10 @@ func (json *JsonObject) GetTime(key string) (*time.Time, *JsonFieldError) {
 func (json *JsonObject) GetUuid(key string) (*uuid.UUID, *JsonFieldError) {
 	val, ok := (*json).data[key]
 	if ok {
-		str := string(val[1 : len(val)-1])
-		return &str, nil
-	}
-	uuid, err := uuid.Parse(val)
-	if err == nil {
-		return uuid, nil
+		uuid, err := uuid.ParseBytes(val)
+		if err == nil {
+			return &uuid, nil
+		}
 	}
 	return nil, NoFieldError(key)
 }
