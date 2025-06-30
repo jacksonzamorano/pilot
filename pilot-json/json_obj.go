@@ -17,19 +17,22 @@
 // which fields are required and how they should be validated.
 //
 // Usage Example:
-//   jsonData := []byte(`{"name":"John","age":30,"email":"john@example.com"}`)
-//   obj := pilot_json.NewJsonObject()
-//   err := obj.Parse(&jsonData)
-//   
-//   name, err := obj.GetString("name")
-//   age, err := obj.GetInt32("age")
-//   email, err := obj.GetString("email")
+//
+//	jsonData := []byte(`{"name":"John","age":30,"email":"john@example.com"}`)
+//	obj := pilot_json.NewJsonObject()
+//	err := obj.Parse(&jsonData)
+//
+//	name, err := obj.GetString("name")
+//	age, err := obj.GetInt32("age")
+//	email, err := obj.GetString("email")
 package pilot_json
 
 import (
 	"errors"
 	"strconv"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 // Parse processes a JSON byte array and extracts all key-value pairs into the JsonObject.
@@ -273,6 +276,19 @@ func (json *JsonObject) GetTime(key string) (*time.Time, *JsonFieldError) {
 			return &t, CouldNotParseError(key)
 		}
 		return &t, nil
+	}
+	return nil, NoFieldError(key)
+}
+
+func (json *JsonObject) GetUuid(key string) (*uuid.UUID, *JsonFieldError) {
+	val, ok := (*json).data[key]
+	if ok {
+		str := string(val[1 : len(val)-1])
+		return &str, nil
+	}
+	uuid, err := uuid.Parse(val)
+	if err == nil {
+		return uuid, nil
 	}
 	return nil, NoFieldError(key)
 }
