@@ -14,10 +14,9 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-type RouteStateCompatible interface{}
+type RouteStateCompatible any
 
 type Application[RouteState RouteStateCompatible] struct {
-	GlobalMiddleware func(*HttpRequest) *RouteState
 	Port             string
 	Routes           *RouteCollection[RouteState]
 	CorsOrigin       string
@@ -25,17 +24,13 @@ type Application[RouteState RouteStateCompatible] struct {
 	CorsMethods      string
 	SilentMode       bool
 	Database         *pgxpool.Pool
+	Configuration    DatabaseConfiguration
 	Context          context.Context
 	WorkerCount      int32
 	LogRequestsLevel int
 }
 
-func NewInlineApplication[RouteState any](port string, cfg DatabaseConfiguration, middlewareFn func(*HttpRequest) *RouteState, ctx context.Context) *Application[RouteState] {
-	pool, err := pgxpool.New(ctx, cfg.GetConnectionString())
-	if err != nil {
-		panic(err)
-	}
-
+func NewInlineApplication[RouteState any](port string, cfg DatabaseConfiguration, ctx context.Context) *Application[RouteState] {
 	return &Application[RouteState]{
 		Port:             port,
 		CorsOrigin:       "*",
@@ -43,20 +38,16 @@ func NewInlineApplication[RouteState any](port string, cfg DatabaseConfiguration
 		CorsMethods:      "GET, PUT, POST, DELETE, HEAD",
 		Routes:           NewRouteCollection[RouteState](),
 		SilentMode:       false,
-		Database:         pool,
-		GlobalMiddleware: middlewareFn,
+		Database:         nil,
 		WorkerCount:      10,
 		Context:          ctx,
+		Configuration:    cfg,
 		LogRequestsLevel: 0,
 	}
 }
 
-func NewApplication[RouteState any](port string, cfg DatabaseConfiguration, middlewareFn func(*HttpRequest) *RouteState) *Application[RouteState] {
+func NewApplication[RouteState any](port string, cfg DatabaseConfiguration) *Application[RouteState] {
 	ctx, _ := signal.NotifyContext(context.Background(), os.Interrupt, os.Kill)
-	pool, err := pgxpool.New(ctx, cfg.GetConnectionString())
-	if err != nil {
-		panic(err)
-	}
 
 	return &Application[RouteState]{
 		Port:             port,
@@ -65,10 +56,10 @@ func NewApplication[RouteState any](port string, cfg DatabaseConfiguration, midd
 		CorsMethods:      "GET, PUT, POST, DELETE, HEAD",
 		Routes:           NewRouteCollection[RouteState](),
 		SilentMode:       false,
-		Database:         pool,
-		GlobalMiddleware: middlewareFn,
+		Database:         nil,
 		WorkerCount:      10,
 		Context:          ctx,
+		Configuration:    cfg,
 		LogRequestsLevel: 0,
 	}
 }
@@ -81,20 +72,26 @@ func (a *Application[RouteState]) AddRouteGroup(prefix string, rg *RouteGroup[Ro
 	}
 	for i := range (*rg).Routes {
 		route := (*rg).Routes[i].Route
-		if strings.HasPrefix(route, "/") {
-			route = route[1:]
-		}
-
+		route = strings.TrimPrefix(route, "/")
 		a.Routes.AddRouteWithMiddleware((*rg).Routes[i].Method, prefix+route, (*rg).Routes[i].Handler, (*rg).Routes[i].Middleware)
 	}
 }
 
 func (a *Application[RouteState]) Start() {
+	pgConfig, err := pgxpool.ParseConfig(a.Configuration.GetConnectionString())
+	if err != nil {
+		panic(err)
+	}
+	pgConfig.MaxConns = a.WorkerCount
+	pool, err := pgxpool.NewWithConfig(a.Context, pgConfig)
+	if err != nil {
+		panic(err)
+	}
+	a.Database = pool
 	if !a.SilentMode {
 		fmt.Printf("Starting server on port %v.\n\nRegistered routes:\n", a.Port)
 		a.Routes.PrintTree()
 	}
-	(*a).Database.Config().MaxConns = a.WorkerCount
 	listener, err := net.Listen("tcp", fmt.Sprintf(":%s", a.Port))
 	if err != nil {
 		panic(err)
@@ -105,8 +102,8 @@ func (a *Application[RouteState]) Start() {
 	for i := int32(0); i < a.WorkerCount; i++ {
 		wg.Add(1)
 		go func() {
+			defer wg.Done()
 			handleRequest(queue, a, (*a).Context, i)
-			wg.Done()
 		}()
 	}
 	go func() {
@@ -144,17 +141,27 @@ func handlerLog(id int32, connId int64, ip net.Addr, msg string) {
 	log.Printf("{%d/%d} (%s): %s\n", id, connId, ip.String(), msg)
 }
 
-func handleRequest[RouteState any](conn <-chan net.Conn, app *Application[RouteState], context context.Context, id int32) {
-	db, err := (*app).Database.Acquire(context)
+func handleRequest[RouteState any](conn <-chan net.Conn, app *Application[RouteState], cn context.Context, id int32) {
+	db, err := (*app).Database.Acquire(cn)
 	if err != nil {
-		panic(err)
+		if !errors.Is(err, context.Canceled) {
+			panic(err)
+		}
+		log.Printf("Worker #%d could not aquire a database connection.", id)
+		return
 	}
 	var connId int64 = 0
+	log.Printf("Worker #%d online, ready for requests.", id)
 ReqLoop:
 	for {
 		select {
-		case <-context.Done():
-			db.Release()
+		case <-cn.Done():
+			if db != nil {
+				log.Printf("Worker #%d shutdown (closed connection).", id)
+				db.Release()
+			} else {
+				log.Printf("Worker #%d shutdown.", id)
+			}
 			return
 		case conn := <-conn:
 			connId++
@@ -208,10 +215,17 @@ ReqLoop:
 				continue ReqLoop
 			}
 
-			routeState := (app.GlobalMiddleware)(request)
+			var routeState RouteState
+
+			routeData := RouteRequest[RouteState]{
+				Context:  &cn,
+				Request:  request,
+				Database: db,
+				State:    &routeState,
+			}
 
 			for i := range handler.Middleware {
-				response = handler.Middleware[i](request, db, routeState)
+				response = handler.Middleware[i](&routeData)
 				if response != nil {
 					response.ApplyCors(&app.CorsOrigin, &app.CorsHeaders, &app.CorsMethods)
 					response.Write(conn)
@@ -220,7 +234,7 @@ ReqLoop:
 				}
 			}
 
-			response = handler.Handler(request, db, routeState)
+			response = handler.Handler(&routeData)
 			if response == nil {
 				handlerLog(id, connId, conn.RemoteAddr(), "Handler returned nil, sending 500.")
 				response = StringResponse("500 Internal Server Error")

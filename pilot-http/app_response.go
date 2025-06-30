@@ -76,7 +76,7 @@ func NotFoundResponse(err string) *HttpResponse {
 	res.StatusCode = StatusNotFound
 	return res
 }
-func DtoErrorResponse(body error) *HttpResponse {
+func ValidationErrorResponse(body error) *HttpResponse {
 	errorResponse := genericResponse{
 		Status:  false,
 		Message: body.Error(),
@@ -94,7 +94,7 @@ func SuccessStringResponse(message string) *HttpResponse {
 		Message: message,
 	})
 }
-func JsonResponse(body interface{}) *HttpResponse {
+func JsonResponse(body any) *HttpResponse {
 	res := NewHttpResponse()
 	res.StatusCode = StatusOK
 	res.Headers["Content-Type"] = "application/json"

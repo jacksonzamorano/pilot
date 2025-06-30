@@ -3,8 +3,6 @@ package pilot_http
 import (
 	"fmt"
 	"strings"
-
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 func (m HttpMethod) String() string {
@@ -80,8 +78,8 @@ func (self *RouteCollection[RouteState]) AddRouteWithMiddleware(method HttpMetho
 	}
 }
 
-type RouteHandlerFn[RouteState RouteStateCompatible] func(*HttpRequest, *pgxpool.Conn, *RouteState) *HttpResponse
-type MiddlewareFn[RouteState RouteStateCompatible] func(*HttpRequest, *pgxpool.Conn, *RouteState) *HttpResponse
+type RouteHandlerFn[RouteState RouteStateCompatible] func(*RouteRequest[RouteState]) *HttpResponse
+type MiddlewareFn[RouteState RouteStateCompatible] func(*RouteRequest[RouteState]) *HttpResponse
 
 type Route[RouteState RouteStateCompatible] struct {
 	PathComponent string
@@ -99,7 +97,7 @@ func (self *Route[RouteState]) PrintTree(level int) {
 	for k := range self.Handlers {
 		methods = append(methods, string(k))
 	}
-	for i := 0; i < level; i++ {
+	for range level {
 		fmt.Print(" ")
 	}
 	fmt.Printf("/%v [%v]\n", self.PathComponent, strings.Join(methods, ", "))

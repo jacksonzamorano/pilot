@@ -134,7 +134,8 @@ func Select[name]() *pilot_db.QueryBuilder\[[name]] {
 }
 [/ifn]
 [if record][br]
-func Insert[name]() *pilot_db.QueryBuilder\[[name]] {
+[import]import "context"[/import]
+func (*obj [name]) Insert[name](ctx *context.Context) *pilot_db.QueryBuilder\[[name]] {
 	return pilot_db.Insert("[table_name]", [name]FromTable)
 	[each join].InnerJoinAs("[ref_table]", "[name]", "[local_field]", "[ref_field]")[/each]
 	[each field][if local].SelectFromBaseAs("[name]", "[name]")[/if][ifn local].SelectFromAs("[ref_field]", "[ref_table]", "[name]")[/ifn][/each]
@@ -143,7 +144,7 @@ func Insert[name]() *pilot_db.QueryBuilder\[[name]] {
 func Update[name]() *pilot_db.QueryBuilder\[[name]] {
 	return pilot_db.Update("[table_name]", [name]FromTable)
 	[each join].InnerJoinAs("[ref_table]", "[name]", "[local_field]", "[ref_field]")[/each]
-	[each field][if local].SelectFromBaseAs("[name]", "[name]")[/if][ifn local].SelectFromAs("[ref_field]", "[ref_table]", "[name]")[/ifn][/each]
+	[each field][nfunc orm.noupdate][if local].SelectFromBaseAs("[name]", "[name]")[/if][ifn local].SelectFromAs("[ref_field]", "[ref_table]", "[name]")[/ifn][/nfunc][/each]
 	[br]
 } 
 func Delete[name]() *pilot_db.QueryBuilder\[[name]] {

@@ -2,6 +2,7 @@ package pilot_http
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"io"
 	"log"
@@ -10,7 +11,16 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 )
+
+type RouteRequest[T any] struct {
+	Request  *HttpRequest
+	Database *pgxpool.Conn
+	Context  *context.Context
+	State    *T
+}
 
 type HttpRequest struct {
 	Path        string
@@ -124,7 +134,7 @@ func ParseRequest(incoming *net.Conn) *HttpRequest {
 		log.Println(err)
 		return nil
 	}
-	qryIdx := strings.Index(req.Path, "?") 
+	qryIdx := strings.Index(req.Path, "?")
 	if qryIdx > -1 {
 		req.QueryString = req.Path[qryIdx+1:]
 		req.Path = req.Path[0:qryIdx]
@@ -141,7 +151,7 @@ func ParseRequest(incoming *net.Conn) *HttpRequest {
 			continue
 		}
 		header := string(bytes)
-		header = header[0:len(header)-2]
+		header = header[0 : len(header)-2]
 		split := strings.Split(header, ":")
 		req.Headers[split[0]] = split[1][1:]
 	}
