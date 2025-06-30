@@ -592,6 +592,10 @@ func (b *QueryBuilder[T]) SelectFromBaseAs(field string, as string) *QueryBuilde
 //	    SelectFromAs("bio", "user_profiles", "profile_bio").      // From profiles
 //	    SelectFromAs("name", "user_companies", "company_name")    // From companies
 func (b *QueryBuilder[T]) SelectFromAs(field string, from string, as string) *QueryBuilder[T] {
+	if from == b.from {
+		b.fields = append(b.fields, SelectField{field, b.from, as, nil})
+		return b
+	}
 	join, ok := b.joinsByName[from]
 	if !ok {
 		log.Fatalf("Attempted to select from join %v but there isn't a join.", from)
