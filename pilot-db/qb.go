@@ -604,13 +604,7 @@ func (b *QueryBuilder[T]) SelectFromAs(field string, from string, as string) *Qu
 	return b
 }
 func (b *QueryBuilder[T]) Where(field string, where string, arg any) *QueryBuilder[T] {
-	var discoveredField string
-	if b.lastJoin != nil {
-		discoveredField = b.lastJoin.alias + "." + field
-	} else {
-		discoveredField = b.from + "." + field
-	}
-	b.where = append(b.where, QueryWhere{where: discoveredField + " " + where, arg: arg, joinWith: ""})
+	b.where = append(b.where, QueryWhere{where: field + " " + where, arg: arg, joinWith: ""})
 	return b
 }
 func (b *QueryBuilder[T]) WhereEq(field string, arg any) *QueryBuilder[T] {
@@ -678,19 +672,11 @@ func (b *QueryBuilder[T]) And() *QueryBuilder[T] {
 	return b
 }
 func (b *QueryBuilder[T]) SortAsc(field string) *QueryBuilder[T] {
-	if b.lastJoin == nil {
-		b.sort = append(b.sort, QuerySort{field: b.from + "." + field, order: "ASC"})
-	} else {
-		b.sort = append(b.sort, QuerySort{field: b.lastJoin.alias + "." + field, order: "ASC"})
-	}
+	b.sort = append(b.sort, QuerySort{field: field, order: "ASC"})
 	return b
 }
 func (b *QueryBuilder[T]) SortDesc(field string) *QueryBuilder[T] {
-	if b.lastJoin == nil {
-		b.sort = append(b.sort, QuerySort{field: b.from + "." + field, order: "DESC"})
-	} else {
-		b.sort = append(b.sort, QuerySort{field: b.lastJoin.alias + "." + field, order: "DESC"})
-	}
+	b.sort = append(b.sort, QuerySort{field: field, order: "DESC"})
 	return b
 }
 func (b *QueryBuilder[T]) Limit(num int) *QueryBuilder[T] {
@@ -698,9 +684,6 @@ func (b *QueryBuilder[T]) Limit(num int) *QueryBuilder[T] {
 	return b
 }
 func (b *QueryBuilder[T]) InnerJoin(table string, local string, foreign string) *QueryBuilder[T] {
-	if b.operation != "SELECT" && b.operation != "DELETE" {
-		log.Fatal("Attempted to join on a non-select query. This is probably not what you want.")
-	}
 	alias := string(rune(65 + len(b.joins)))
 	where := fmt.Sprintf("%v.%v = %v.%v", b.from, local, alias, foreign)
 	b.joins = append(b.joins, QueryJoin{joinKind: "INNER JOIN", table: table, where: where, alias: alias})
@@ -709,10 +692,11 @@ func (b *QueryBuilder[T]) InnerJoin(table string, local string, foreign string) 
 	return b
 }
 func (b *QueryBuilder[T]) InnerJoinAs(table string, alias string, local string, foreign string) *QueryBuilder[T] {
-	if b.operation != "SELECT" && b.operation != "DELETE" {
-		log.Fatal("Attempted to join on a non-select query. This is probably not what you want.")
+	loc := b.from
+	if b.operation != "SELECT" {
+		loc = "_res"
 	}
-	where := fmt.Sprintf("%v.%v = %v.%v", b.from, local, alias, foreign)
+	where := fmt.Sprintf("%v.%v = %v.%v", loc, local, alias, foreign)
 	b.joins = append(b.joins, QueryJoin{joinKind: "INNER JOIN", table: table, where: where, alias: alias})
 	b.lastJoin = &b.joins[len(b.joins)-1]
 	b.joinsByName[alias] = b.lastJoin
