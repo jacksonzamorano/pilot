@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -94,6 +95,21 @@ func (req *HttpRequest) QueryGetString(key string) *string {
 		return &val
 	}
 	return nil
+}
+func (req *HttpRequest) QueryGetUUID(key string) *uuid.UUID {
+	if req._tempMap == nil {
+		m := req.QueryMap()
+		req._tempMap = &m
+	}
+	val, ok := (*req._tempMap)[key]
+	if !ok {
+		return nil
+	}
+	g, err := uuid.Parse(val)
+	if err != nil {
+		return nil
+	}
+	return &g
 }
 
 func (req *HttpRequest) Dump() {
