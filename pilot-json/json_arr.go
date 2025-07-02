@@ -16,13 +16,20 @@ func NewJsonArray() *JsonArray {
 }
 
 func (this *JsonArray) Parse(json *[]byte) error {
-	if (*json)[0] != '[' {
-		return errors.New("Expected array")
+	i := 0
+	for {
+		if (*json)[i] == '[' {
+			i++
+			break
+		}
+		i++
+		if i == len(*json) {
+			return errors.New("Expected array")
+		}
 	}
 	valueStart := 1
 	curly_delim := 0
 	square_delim := 0
-	i := 1
 	quote := false
 	for i < len((*json))-1 {
 		valueStart = i
@@ -80,7 +87,25 @@ func (json *JsonArray) GetInt64(index int) (*int64, *JsonFieldError) {
 		return nil, NoFieldError(strconv.Itoa(index))
 	}
 	val := (*json).data[index]
-	i, err := strconv.ParseInt(string(val), 10, 64)
+	innerIdx := 0
+	innerEnd := len(val) - 1
+
+	for innerIdx < innerEnd {
+		if val[innerIdx] == ' ' || val[innerIdx] == '\n' || val[innerIdx] == '\t' {
+			innerIdx++
+			continue
+		}
+		break
+	}
+	for innerIdx < innerEnd {
+		if val[innerEnd] == ' ' || val[innerEnd] == '\n' || val[innerEnd] == '\t' {
+			innerEnd--
+			continue
+		}
+		break
+	}
+
+	i, err := strconv.ParseInt(string(val[innerIdx:innerEnd]), 10, 64)
 	if err != nil {
 		return nil, InvalidFieldError(strconv.Itoa(index), "int64")
 	}
