@@ -19,21 +19,22 @@
 // - All operations use secure random number generation
 //
 // Usage Example:
-//   // Create an authentication payload
-//   payload := pilot_exchange.AuthPayload{
-//       AccountId:  123,
-//       Expiration: time.Now().Add(24 * time.Hour),
-//   }
-//   
-//   // Encrypt the payload into a token
-//   token := pilot_exchange.EncodeJson(payload)
-//   
-//   // Later, decrypt and verify the token
-//   decoded := pilot_exchange.DecodeJson[pilot_exchange.AuthPayload](token)
-//   if decoded != nil && decoded.Expiration.After(time.Now()) {
-//       // Token is valid and not expired
-//       userID := decoded.AccountId
-//   }
+//
+//	// Create an authentication payload
+//	payload := pilot_exchange.AuthPayload{
+//	    AccountId:  123,
+//	    Expiration: time.Now().Add(24 * time.Hour),
+//	}
+//
+//	// Encrypt the payload into a token
+//	token := pilot_exchange.EncodeJson(payload)
+//
+//	// Later, decrypt and verify the token
+//	decoded := pilot_exchange.DecodeJson[pilot_exchange.AuthPayload](token)
+//	if decoded != nil && decoded.Expiration.After(time.Now()) {
+//	    // Token is valid and not expired
+//	    userID := decoded.AccountId
+//	}
 package pilot_exchange
 
 import (
@@ -57,10 +58,11 @@ import (
 //   - Expiration: The timestamp when this token becomes invalid
 //
 // Example:
-//   payload := pilot_exchange.AuthPayload{
-//       AccountId:  userID,
-//       Expiration: time.Now().Add(7 * 24 * time.Hour), // Valid for 7 days
-//   }
+//
+//	payload := pilot_exchange.AuthPayload{
+//	    AccountId:  userID,
+//	    Expiration: time.Now().Add(7 * 24 * time.Hour), // Valid for 7 days
+//	}
 type AuthPayload struct {
 	AccountId  int64     `json:"account_id"`
 	Expiration time.Time `json:"expiration"`
@@ -75,8 +77,9 @@ type AuthPayload struct {
 //   - string: The 32-byte encryption key for AES operations
 //
 // Security Note:
-//   The SIGNING_KEY environment variable must contain exactly 32 bytes for AES-256.
-//   Using the default key in production is a critical security vulnerability.
+//
+//	The SIGNING_KEY environment variable must contain exactly 32 bytes for AES-256.
+//	Using the default key in production is a critical security vulnerability.
 func getSecret() string {
 	key, exists := os.LookupEnv("SIGNING_KEY")
 	if exists {
@@ -106,13 +109,15 @@ func getSecret() string {
 //   - string: A hexadecimal-encoded encrypted token
 //
 // Example:
-//   payload := AuthPayload{AccountId: 123, Expiration: time.Now().Add(time.Hour)}
-//   token := pilot_exchange.EncodeJson(payload)
-//   // Send token to client in response header or cookie
+//
+//	payload := AuthPayload{AccountId: 123, Expiration: time.Now().Add(time.Hour)}
+//	token := pilot_exchange.EncodeJson(payload)
+//	// Send token to client in response header or cookie
 //
 // Security Note:
-//   Each call generates a unique IV, so the same data will produce different tokens.
-//   This prevents attackers from detecting when the same data is being transmitted.
+//
+//	Each call generates a unique IV, so the same data will produce different tokens.
+//	This prevents attackers from detecting when the same data is being transmitted.
 func EncodeJson(data interface{}) string {
 	contents, _ := json.Marshal(data)
 	content_size := len(contents)
@@ -155,24 +160,29 @@ func EncodeJson(data interface{}) string {
 //   - *Data: A pointer to the decrypted data structure, or nil if decryption fails
 //
 // Example:
-//   token := "..." // Received from client
-//   payload := pilot_exchange.DecodeJson[AuthPayload](token)
-//   if payload != nil && payload.Expiration.After(time.Now()) {
-//       // Token is valid and not expired
-//       userID := payload.AccountId
-//   } else {
-//       // Token is invalid, expired, or corrupted
-//       return unauthorizedResponse()
-//   }
+//
+//	token := "..." // Received from client
+//	payload := pilot_exchange.DecodeJson[AuthPayload](token)
+//	if payload != nil && payload.Expiration.After(time.Now()) {
+//	    // Token is valid and not expired
+//	    userID := payload.AccountId
+//	} else {
+//	    // Token is invalid, expired, or corrupted
+//	    return unauthorizedResponse()
+//	}
 //
 // Error Handling:
-//   Returns nil for any of the following conditions:
-//   - Invalid hexadecimal encoding
-//   - Corrupted or tampered token data
-//   - Wrong encryption key
-//   - Invalid JSON structure
-//   - Mismatched data type
+//
+//	Returns nil for any of the following conditions:
+//	- Invalid hexadecimal encoding
+//	- Corrupted or tampered token data
+//	- Wrong encryption key
+//	- Invalid JSON structure
+//	- Mismatched data type
 func DecodeJson[Data any](contents string) *Data {
+	if len(contents) == 0 {
+		return nil
+	}
 	encrypted, err := hex.DecodeString(contents)
 	if err != nil {
 		log.Println("Couldn't decode contents of encrypted blob.")
