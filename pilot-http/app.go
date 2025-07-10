@@ -53,7 +53,7 @@ func NewApplication[RouteState any](port string, cfg DatabaseConfiguration) *App
 		Port:             port,
 		CorsOrigin:       "*",
 		CorsHeaders:      "*",
-		CorsMethods:      "GET, PUT, POST, DELETE, HEAD",
+		CorsMethods:      "GET, PUT, POST, DELETE, HEAD, PATCH",
 		Routes:           NewRouteCollection[RouteState](),
 		SilentMode:       false,
 		Database:         nil,
