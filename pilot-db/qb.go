@@ -728,15 +728,11 @@ func (b *QueryBuilder[T]) Force() *QueryBuilder[T] {
 	b.warn = false
 	return b
 }
-func (b *QueryBuilder[T]) selectToString(replaceLocal string) string {
+func (b *QueryBuilder[T]) selectToString() string {
 	var query string
 	for _, field := range b.fields {
 		if field.expr == nil {
-			if replaceLocal != "" && field.table == b.from {
-				query += replaceLocal + "."
-			} else {
-				query += field.table + "."
-			}
+			query += field.table + "."
 			query += field.name
 			if field.as != "" {
 				query += " AS " + field.as
@@ -850,7 +846,7 @@ func (b QueryBuilder[T]) BuildOffset(idx int, selectResults bool) (string, []any
 		if b.groupBy != nil {
 			groupBy = " GROUP BY " + *b.groupBy
 		}
-		query = fmt.Sprintf("SELECT %s FROM %s %s %s %v %s %s", b.selectToString(""), b.from, b.joinToString(), whereQuery, b.sortToString(), b.limitString(), groupBy)
+		query = fmt.Sprintf("SELECT %s FROM %s %s %s %v %s %s", b.selectToString(), b.from, b.joinToString(), whereQuery, b.sortToString(), b.limitString(), groupBy)
 	case "UPDATE":
 		updateQuery, updateArgs := b.setToUpdateString()
 		whereQuery, whereArgs := b.whereToString()
@@ -860,7 +856,7 @@ func (b QueryBuilder[T]) BuildOffset(idx int, selectResults bool) (string, []any
 		if !selectResults {
 			query = innerQuery
 		} else {
-			query = fmt.Sprintf("WITH _res AS (%v RETURNING *) SELECT %v FROM _res %v %v", innerQuery, b.selectToString("_res"), b.joinToString(), b.sortToString())
+			query = fmt.Sprintf("WITH _res AS (%v RETURNING *) SELECT %v FROM _res AS %v %v %v", innerQuery, b.selectToString(), b.from, b.joinToString(), b.sortToString())
 		}
 	case "INSERT":
 		insertQuery, insertArgString, insertArgs := b.setToInsertString()
@@ -869,7 +865,7 @@ func (b QueryBuilder[T]) BuildOffset(idx int, selectResults bool) (string, []any
 		if !selectResults {
 			query = innerQuery
 		} else {
-			query = fmt.Sprintf("WITH _res AS (%v RETURNING *) SELECT %v FROM _res %v %v", innerQuery, b.selectToString("_res"), b.joinToString(), b.sortToString())
+			query = fmt.Sprintf("WITH _res AS (%v RETURNING *) SELECT %v FROM _res AS %v %v %v", innerQuery, b.selectToString(), b.from, b.joinToString(), b.sortToString())
 		}
 	case "DELETE":
 		whereQuery, whereArgs := b.whereToString()
@@ -878,7 +874,7 @@ func (b QueryBuilder[T]) BuildOffset(idx int, selectResults bool) (string, []any
 		if !selectResults {
 			query = innerQuery
 		} else {
-			query = fmt.Sprintf("WITH _res AS (%v RETURNING *) SELECT %v FROM _res %v %v", innerQuery, b.selectToString("_res"), b.joinToString(), b.sortToString())
+			query = fmt.Sprintf("WITH _res AS (%v RETURNING *) SELECT %v FROM _res AS %v %v %v", innerQuery, b.selectToString(), b.from, b.joinToString(), b.sortToString())
 		}
 	}
 	query_final := ""
