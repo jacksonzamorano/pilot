@@ -35,7 +35,7 @@ func NewInlineApplication[RouteState any](port string, cfg DatabaseConfiguration
 		Port:             port,
 		CorsOrigin:       "*",
 		CorsHeaders:      "*",
-		CorsMethods:      "GET, PUT, POST, DELETE, HEAD",
+		CorsMethods:      "GET, PUT, POST, DELETE, HEAD, PATCH",
 		Routes:           NewRouteCollection[RouteState](),
 		SilentMode:       false,
 		Database:         nil,
