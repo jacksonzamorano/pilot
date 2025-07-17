@@ -127,6 +127,10 @@ func EndTransaction(tx pgx.Tx) error {
 //	}
 type FromTableFn[T any] func(row pgx.Rows, val *T) error
 
+type KeyValue interface {
+	~string
+}
+
 // QueryBuilder is the core struct that represents a SQL query being constructed.
 // It uses a fluent API pattern where methods can be chained together to build
 // complex queries. The builder is generic over type T, which represents the target
@@ -164,7 +168,7 @@ type FromTableFn[T any] func(row pgx.Rows, val *T) error
 //	    Where("active", "= $", true).
 //	    SortDesc("created_at").
 //	    Limit(10)
-type QueryBuilder[T any] struct {
+type QueryBuilder[T any, ReadKeys KeyValue, WriteKeys KeyValue, SortKeys KeyValue] struct {
 	ctx         *context.Context
 	db          *pgxpool.Conn
 	operation   string
@@ -205,8 +209,27 @@ type QueryBuilder[T any] struct {
 //	    Where("active", "= $", true)
 //
 //	users, err := query.QueryMany(ctx, conn)
-func Select[T any](table string, ctx *context.Context, db *pgxpool.Conn, conversion FromTableFn[T]) *QueryBuilder[T] {
-	return &QueryBuilder[T]{
+func Select[T any](table string, ctx *context.Context, db *pgxpool.Conn, conversion FromTableFn[T]) *QueryBuilder[T, string, string, string] {
+	return &QueryBuilder[T, string, string, string]{
+		ctx:         ctx,
+		db:          db,
+		operation:   "SELECT",
+		from:        table,
+		fields:      []SelectField{},
+		joins:       []QueryJoin{},
+		set:         []map[string]SetField{make(map[string]SetField, 0)},
+		lastJoin:    nil,
+		where:       []QueryWhere{},
+		conversion:  conversion,
+		warn:        true,
+		sort:        []QuerySort{},
+		joinsByName: map[string]*QueryJoin{},
+		limit:       -1,
+	}
+}
+
+func SelectKeyed[T any, RK KeyValue, WK KeyValue, SK KeyValue](table string, ctx *context.Context, db *pgxpool.Conn, conversion FromTableFn[T]) *QueryBuilder[T, RK, WK, SK] {
+	return &QueryBuilder[T, RK, WK, SK]{
 		ctx:         ctx,
 		db:          db,
 		operation:   "SELECT",
@@ -247,8 +270,26 @@ func Select[T any](table string, ctx *context.Context, db *pgxpool.Conn, convers
 //	    Where("id", "= $", 123)
 //
 //	err := query.QueryInTransaction(ctx, tx)
-func Update[T any](table string, ctx *context.Context, db *pgxpool.Conn, conversion FromTableFn[T]) *QueryBuilder[T] {
-	return &QueryBuilder[T]{
+func Update[T any](table string, ctx *context.Context, db *pgxpool.Conn, conversion FromTableFn[T]) *QueryBuilder[T, string, string, string] {
+	return &QueryBuilder[T, string, string, string]{
+		ctx:         ctx,
+		db:          db,
+		operation:   "UPDATE",
+		from:        table,
+		fields:      []SelectField{},
+		joins:       []QueryJoin{},
+		set:         []map[string]SetField{make(map[string]SetField, 0)},
+		lastJoin:    nil,
+		where:       []QueryWhere{},
+		conversion:  conversion,
+		warn:        true,
+		sort:        []QuerySort{},
+		joinsByName: map[string]*QueryJoin{},
+		limit:       -1,
+	}
+}
+func UpdateKeyed[T any, RK KeyValue, WK KeyValue, SK KeyValue](table string, ctx *context.Context, db *pgxpool.Conn, conversion FromTableFn[T]) *QueryBuilder[T, RK, WK, SK] {
+	return &QueryBuilder[T, RK, WK, SK]{
 		ctx:         ctx,
 		db:          db,
 		operation:   "UPDATE",
@@ -295,8 +336,26 @@ func Update[T any](table string, ctx *context.Context, db *pgxpool.Conn, convers
 //	bulkQuery := pilot_db.Insert("users", userFromRow).
 //	    Set("name", "User 1").Set("email", "user1@example.com").  // First row
 //	    Set("name", "User 2").Set("email", "user2@example.com")   // Second row
-func Insert[T any](table string, ctx *context.Context, db *pgxpool.Conn, conversion FromTableFn[T]) *QueryBuilder[T] {
-	return &QueryBuilder[T]{
+func Insert[T any](table string, ctx *context.Context, db *pgxpool.Conn, conversion FromTableFn[T]) *QueryBuilder[T, string, string, string] {
+	return &QueryBuilder[T, string, string, string]{
+		ctx:         ctx,
+		db:          db,
+		operation:   "INSERT",
+		from:        table,
+		fields:      []SelectField{},
+		joins:       []QueryJoin{},
+		set:         []map[string]SetField{make(map[string]SetField, 0)},
+		lastJoin:    nil,
+		where:       []QueryWhere{},
+		conversion:  conversion,
+		warn:        true,
+		sort:        []QuerySort{},
+		joinsByName: map[string]*QueryJoin{},
+		limit:       -1,
+	}
+}
+func InsertKeyed[T any, RK KeyValue, WK KeyValue, SK KeyValue](table string, ctx *context.Context, db *pgxpool.Conn, conversion FromTableFn[T]) *QueryBuilder[T, RK, WK, SK] {
+	return &QueryBuilder[T, RK, WK, SK]{
 		ctx:         ctx,
 		db:          db,
 		operation:   "INSERT",
@@ -341,8 +400,26 @@ func Insert[T any](table string, ctx *context.Context, db *pgxpool.Conn, convers
 //	// Force delete all records (dangerous!)
 //	query := pilot_db.Delete("temp_data", tempDataFromRow).
 //	    Force()  // Required to delete without WHERE clause
-func Delete[T any](table string, ctx *context.Context, db *pgxpool.Conn, conversion FromTableFn[T]) *QueryBuilder[T] {
-	return &QueryBuilder[T]{
+func Delete[T any](table string, ctx *context.Context, db *pgxpool.Conn, conversion FromTableFn[T]) *QueryBuilder[T, string, string, string] {
+	return &QueryBuilder[T, string, string, string]{
+		ctx:         ctx,
+		db:          db,
+		operation:   "DELETE",
+		from:        table,
+		fields:      []SelectField{},
+		joins:       []QueryJoin{},
+		set:         []map[string]SetField{make(map[string]SetField, 0)},
+		lastJoin:    nil,
+		where:       []QueryWhere{},
+		conversion:  conversion,
+		warn:        true,
+		sort:        []QuerySort{},
+		joinsByName: map[string]*QueryJoin{},
+		limit:       -1,
+	}
+}
+func DeleteKeyed[T any, RK KeyValue, WK KeyValue, SK KeyValue](table string, ctx *context.Context, db *pgxpool.Conn, conversion FromTableFn[T]) *QueryBuilder[T, RK, WK, SK] {
+	return &QueryBuilder[T, RK, WK, SK]{
 		ctx:         ctx,
 		db:          db,
 		operation:   "DELETE",
@@ -391,27 +468,27 @@ func Delete[T any](table string, ctx *context.Context, db *pgxpool.Conn, convers
 //	    Set("name", "Updated Name").
 //	    Set("updated_at", time.Now()).
 //	    Where("id", "= $", userId)
-func (b *QueryBuilder[T]) Set(field string, value any) *QueryBuilder[T] {
+func (b *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) Set(field WriteKeys, value any) *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys] {
 	if b.operation != "UPDATE" && b.operation != "INSERT" {
 		log.Fatal("Attempted to set a field on a non-update/insert query. This is probably not what you want.")
 	}
-	set := SetField{field, nil, value}
+	set := SetField{string(field), nil, value}
 	lastRecord := len(b.set) - 1
-	_, fieldAtLast := b.set[lastRecord][field]
+	_, fieldAtLast := b.set[lastRecord][string(field)]
 	if !fieldAtLast {
 		if lastRecord > 1 {
-			_, inLast := b.set[lastRecord-1][field]
+			_, inLast := b.set[lastRecord-1][string(field)]
 			if !inLast {
 				log.Fatal("Attempted to set a field in a bulk insert which wasn't in the previous row. Bulk inserts require the same arguments in every row")
 			}
 		}
-		b.set[lastRecord][field] = set
+		b.set[lastRecord][string(field)] = set
 	} else {
 		if b.operation != "INSERT" {
 			log.Fatal("Added a duplicate key. This is used for bulk inserts but this operation is not an insert.")
 		}
 		newRow := map[string]SetField{}
-		newRow[field] = set
+		newRow[string(field)] = set
 		b.set = append(b.set, newRow)
 	}
 	return b
@@ -442,27 +519,27 @@ func (b *QueryBuilder[T]) Set(field string, value any) *QueryBuilder[T] {
 //	query := pilot_db.Update("products", productFromRow).
 //	    SetLiteral("price", "price * 1.1").  // 10% price increase
 //	    Where("category", "= $", "electronics")
-func (b *QueryBuilder[T]) SetLiteral(field string, value string) *QueryBuilder[T] {
+func (b *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) SetLiteral(field WriteKeys, value string) *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys] {
 	if b.operation != "UPDATE" {
 		log.Fatal("Attempted to set a field using literal syntax on a non-update query. This is probably not what you want.")
 	}
-	set := SetField{field, &value, nil}
+	set := SetField{string(field), &value, nil}
 	lastRecord := len(b.set) - 1
-	_, fieldAtLast := b.set[lastRecord][field]
+	_, fieldAtLast := b.set[lastRecord][string(field)]
 	if !fieldAtLast {
 		if lastRecord > 1 {
-			_, inLast := b.set[lastRecord-1][field]
+			_, inLast := b.set[lastRecord-1][string(field)]
 			if !inLast {
 				log.Fatal("Attempted to set a field in a bulk insert which wasn't in the previous row. Bulk inserts require the same arguments in every row")
 			}
 		}
-		b.set[lastRecord][field] = set
+		b.set[lastRecord][string(field)] = set
 	} else {
 		if b.operation != "INSERT" {
 			log.Fatal("Added a duplicate key. This is used for bulk inserts but this operation is not an insert.")
 		}
 		newRow := map[string]SetField{}
-		newRow[field] = set
+		newRow[string(field)] = set
 		b.set = append(b.set, newRow)
 	}
 	return b
@@ -491,11 +568,11 @@ func (b *QueryBuilder[T]) SetLiteral(field string, value string) *QueryBuilder[T
 //	    Select("id").Select("name").          // From users table
 //	    InnerJoin("profiles", "id", "user_id").
 //	    Select("bio").Select("avatar_url")    // From profiles table (current context)
-func (b *QueryBuilder[T]) Select(field string) *QueryBuilder[T] {
+func (b *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) Select(field ReadKeys) *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys] {
 	if b.lastJoin != nil {
-		b.fields = append(b.fields, SelectField{field, b.lastJoin.alias, field, nil})
+		b.fields = append(b.fields, SelectField{string(field), b.lastJoin.alias, string(field), nil})
 	} else {
-		b.fields = append(b.fields, SelectField{field, b.from, field, nil})
+		b.fields = append(b.fields, SelectField{string(field), b.from, string(field), nil})
 	}
 	return b
 }
@@ -518,11 +595,11 @@ func (b *QueryBuilder[T]) Select(field string) *QueryBuilder[T] {
 //	    SelectAs("created_at", "signup_date").
 //	    InnerJoin("companies", "company_id", "id").
 //	    SelectAs("name", "company_name")  // Avoids conflict with users.name
-func (b *QueryBuilder[T]) SelectAs(field string, as string) *QueryBuilder[T] {
+func (b *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) SelectAs(field ReadKeys, as string) *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys] {
 	if b.lastJoin != nil {
-		b.fields = append(b.fields, SelectField{field, b.lastJoin.alias, as, nil})
+		b.fields = append(b.fields, SelectField{string(field), b.lastJoin.alias, as, nil})
 	} else {
-		b.fields = append(b.fields, SelectField{field, b.from, as, nil})
+		b.fields = append(b.fields, SelectField{string(field), b.from, as, nil})
 	}
 	return b
 }
@@ -544,8 +621,8 @@ func (b *QueryBuilder[T]) SelectAs(field string, as string) *QueryBuilder[T] {
 //	    Select("name").
 //	    SelectExprFromBase("age_years", "EXTRACT(YEAR FROM AGE(birth_date))").
 //	    SelectExprFromBase("full_name", "CONCAT(first_name, ' ', last_name)")
-func (b *QueryBuilder[T]) SelectExprFromBase(field string, expr string) *QueryBuilder[T] {
-	b.fields = append(b.fields, SelectField{field, b.from, "", &expr})
+func (b *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) SelectExprFromBase(field ReadKeys, expr string) *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys] {
+	b.fields = append(b.fields, SelectField{string(field), b.from, "", &expr})
 	return b
 }
 
@@ -566,8 +643,8 @@ func (b *QueryBuilder[T]) SelectExprFromBase(field string, expr string) *QueryBu
 //	    InnerJoin("profiles", "id", "user_id").
 //	    Select("bio").                              // From profiles (current context)
 //	    SelectFromBaseAs("name", "user_name")       // Explicitly from users table
-func (b *QueryBuilder[T]) SelectFromBaseAs(field string, as string) *QueryBuilder[T] {
-	b.fields = append(b.fields, SelectField{field, b.from, as, nil})
+func (b *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) SelectFromBaseAs(field ReadKeys, as string) *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys] {
+	b.fields = append(b.fields, SelectField{string(field), b.from, as, nil})
 	return b
 }
 
@@ -591,71 +668,71 @@ func (b *QueryBuilder[T]) SelectFromBaseAs(field string, as string) *QueryBuilde
 //	    Select("name").                                           // From users
 //	    SelectFromAs("bio", "user_profiles", "profile_bio").      // From profiles
 //	    SelectFromAs("name", "user_companies", "company_name")    // From companies
-func (b *QueryBuilder[T]) SelectFromAs(field string, from string, as string) *QueryBuilder[T] {
+func (b *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) SelectFromAs(field ReadKeys, from string, as string) *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys] {
 	if from == b.from {
-		b.fields = append(b.fields, SelectField{field, b.from, as, nil})
+		b.fields = append(b.fields, SelectField{string(field), b.from, as, nil})
 		return b
 	}
 	join, ok := b.joinsByName[from]
 	if !ok {
 		log.Fatalf("Attempted to select from join %v but there isn't a join.", from)
 	}
-	b.fields = append(b.fields, SelectField{field, join.alias, as, nil})
+	b.fields = append(b.fields, SelectField{string(field), join.alias, as, nil})
 	return b
 }
-func (b *QueryBuilder[T]) Where(field string, where string, arg any) *QueryBuilder[T] {
-	b.where = append(b.where, QueryWhere{where: field + " " + where, arg: arg, joinWith: ""})
+func (b *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) Where(field ReadKeys, where string, arg any) *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys] {
+	b.where = append(b.where, QueryWhere{where: string(field) + " " + where, arg: arg, joinWith: ""})
 	return b
 }
-func (b *QueryBuilder[T]) WhereEq(field string, arg any) *QueryBuilder[T] {
+func (b *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) WhereEq(field ReadKeys, arg any) *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys] {
 	b.Where(field, "= $", arg)
 	return b
 }
-func (b *QueryBuilder[T]) WhereNe(field string, arg any) *QueryBuilder[T] {
+func (b *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) WhereNe(field ReadKeys, arg any) *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys] {
 	b.Where(field, " <> $", arg)
 	return b
 }
-func (b *QueryBuilder[T]) WhereLt(field string, arg any) *QueryBuilder[T] {
+func (b *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) WhereLt(field ReadKeys, arg any) *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys] {
 	b.Where(field, " < $", arg)
 	return b
 }
-func (b *QueryBuilder[T]) WhereLte(field string, arg any) *QueryBuilder[T] {
+func (b *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) WhereLte(field ReadKeys, arg any) *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys] {
 	b.Where(field, " <= $", arg)
 	return b
 }
-func (b *QueryBuilder[T]) WhereGt(field string, arg any) *QueryBuilder[T] {
+func (b *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) WhereGt(field ReadKeys, arg any) *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys] {
 	b.Where(field, " > $", arg)
 	return b
 }
-func (b *QueryBuilder[T]) WhereGte(field string, arg any) *QueryBuilder[T] {
+func (b *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) WhereGte(field ReadKeys, arg any) *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys] {
 	b.Where(field, " >= $", arg)
 	return b
 }
-func (b *QueryBuilder[T]) WhereAny(field string, arg any) *QueryBuilder[T] {
+func (b *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) WhereAny(field ReadKeys, arg any) *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys] {
 	b.Where(field, " = ANY($)", arg)
 	return b
 }
-func (b *QueryBuilder[T]) WhereNull(field string) *QueryBuilder[T] {
+func (b *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) WhereNull(field ReadKeys) *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys] {
 	b.Where(field, " IS NULL", nil)
 	return b
 }
-func (b *QueryBuilder[T]) WhereNotNull(field string) *QueryBuilder[T] {
+func (b *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) WhereNotNull(field ReadKeys) *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys] {
 	b.Where(field, " IS NOT NULL", nil)
 	return b
 }
-func (b *QueryBuilder[T]) WhereLike(field string, values any) *QueryBuilder[T] {
+func (b *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) WhereLike(field ReadKeys, values any) *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys] {
 	b.Where(field, " LIKE $", values)
 	return b
 }
-func (b *QueryBuilder[T]) WhereNotLike(field string, values any) *QueryBuilder[T] {
+func (b *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) WhereNotLike(field ReadKeys, values any) *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys] {
 	b.Where(field, " NOT LIKE $", values)
 	return b
 }
-func (b *QueryBuilder[T]) WhereLikeInsensitive(field string, values any) *QueryBuilder[T] {
+func (b *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) WhereLikeInsensitive(field ReadKeys, values any) *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys] {
 	b.Where(field, " ILIKE $", values)
 	return b
 }
-func (b *QueryBuilder[T]) Or() *QueryBuilder[T] {
+func (b *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) Or() *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys] {
 	if len(b.where) > 0 {
 		b.where[len(b.where)-1].joinWith = "OR"
 	} else {
@@ -663,7 +740,7 @@ func (b *QueryBuilder[T]) Or() *QueryBuilder[T] {
 	}
 	return b
 }
-func (b *QueryBuilder[T]) And() *QueryBuilder[T] {
+func (b *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) And() *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys] {
 	if len(b.where) > 0 {
 		b.where[len(b.where)-1].joinWith = "AND"
 	} else {
@@ -671,19 +748,19 @@ func (b *QueryBuilder[T]) And() *QueryBuilder[T] {
 	}
 	return b
 }
-func (b *QueryBuilder[T]) SortAsc(field string) *QueryBuilder[T] {
-	b.sort = append(b.sort, QuerySort{field: field, order: "ASC"})
+func (b *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) SortAsc(field SortKeys) *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys] {
+	b.sort = append(b.sort, QuerySort{field: string(field), order: "ASC"})
 	return b
 }
-func (b *QueryBuilder[T]) SortDesc(field string) *QueryBuilder[T] {
-	b.sort = append(b.sort, QuerySort{field: field, order: "DESC"})
+func (b *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) SortDesc(field SortKeys) *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys] {
+	b.sort = append(b.sort, QuerySort{field: string(field), order: "DESC"})
 	return b
 }
-func (b *QueryBuilder[T]) Limit(num int) *QueryBuilder[T] {
+func (b *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) Limit(num int) *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys] {
 	b.limit = num
 	return b
 }
-func (b *QueryBuilder[T]) InnerJoin(table string, local string, foreign string) *QueryBuilder[T] {
+func (b *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) InnerJoin(table string, local string, foreign string) *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys] {
 	alias := string(rune(65 + len(b.joins)))
 	where := fmt.Sprintf("%v.%v = %v.%v", b.from, local, alias, foreign)
 	b.joins = append(b.joins, QueryJoin{joinKind: "INNER JOIN", table: table, where: where, alias: alias})
@@ -691,7 +768,7 @@ func (b *QueryBuilder[T]) InnerJoin(table string, local string, foreign string) 
 	b.joinsByName[b.lastJoin.alias] = b.lastJoin
 	return b
 }
-func (b *QueryBuilder[T]) InnerJoinAs(table string, alias string, local string, foreign string) *QueryBuilder[T] {
+func (b *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) InnerJoinAs(table string, alias string, local string, foreign string) *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys] {
 	loc := b.from
 	if b.operation != "SELECT" {
 		loc = "_res"
@@ -702,11 +779,11 @@ func (b *QueryBuilder[T]) InnerJoinAs(table string, alias string, local string, 
 	b.joinsByName[alias] = b.lastJoin
 	return b
 }
-func (b *QueryBuilder[T]) GroupBy(field string) *QueryBuilder[T] {
+func (b *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) GroupBy(field string) *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys] {
 	b.groupBy = &field
 	return b
 }
-func (b *QueryBuilder[T]) Context(table string) *QueryBuilder[T] {
+func (b *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) Context(table string) *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys] {
 	if b.from == table {
 		b.lastJoin = nil
 	} else {
@@ -720,15 +797,15 @@ func (b *QueryBuilder[T]) Context(table string) *QueryBuilder[T] {
 	}
 	return b
 }
-func (b *QueryBuilder[T]) Base() *QueryBuilder[T] {
+func (b *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) Base() *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys] {
 	b.lastJoin = nil
 	return b
 }
-func (b *QueryBuilder[T]) Force() *QueryBuilder[T] {
+func (b *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) Force() *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys] {
 	b.warn = false
 	return b
 }
-func (b *QueryBuilder[T]) selectToString() string {
+func (b *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) selectToString() string {
 	var query string
 	for _, field := range b.fields {
 		if field.expr == nil {
@@ -744,7 +821,7 @@ func (b *QueryBuilder[T]) selectToString() string {
 	}
 	return query[:len(query)-2]
 }
-func (b *QueryBuilder[T]) joinToString() string {
+func (b *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) joinToString() string {
 	var query string
 	for _, join := range b.joins {
 		query += join.joinKind + " " + join.table + " " + join.alias + " ON " + join.where
@@ -756,7 +833,7 @@ func (b *QueryBuilder[T]) joinToString() string {
 		return query
 	}
 }
-func (b *QueryBuilder[T]) setToInsertString() (string, string, []any) {
+func (b *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) setToInsertString() (string, string, []any) {
 	args := []any{}
 	keys := []string{}
 	var fieldString string = ""
@@ -776,7 +853,7 @@ func (b *QueryBuilder[T]) setToInsertString() (string, string, []any) {
 	}
 	return fieldString[:len(fieldString)-1], argString[:len(argString)-1], args
 }
-func (b *QueryBuilder[T]) setToUpdateString() (string, []any) {
+func (b *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) setToUpdateString() (string, []any) {
 	args := []any{}
 	var query string = ""
 	for fieldKey := range b.set[0] {
@@ -790,7 +867,7 @@ func (b *QueryBuilder[T]) setToUpdateString() (string, []any) {
 	}
 	return query[:len(query)-1], args
 }
-func (b *QueryBuilder[T]) whereToString() (string, []any) {
+func (b *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) whereToString() (string, []any) {
 	var args []any = []any{}
 	var query string = "WHERE "
 	if len(b.where) == 0 {
@@ -809,7 +886,7 @@ func (b *QueryBuilder[T]) whereToString() (string, []any) {
 	}
 	return query[:len(query)-5], args
 }
-func (b *QueryBuilder[T]) sortToString() string {
+func (b *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) sortToString() string {
 	if len(b.sort) == 0 {
 		return ""
 	}
@@ -823,7 +900,7 @@ func (b *QueryBuilder[T]) sortToString() string {
 	}
 	return query[:len(query)-2]
 }
-func (b *QueryBuilder[T]) limitString() string {
+func (b *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) limitString() string {
 	query := ""
 	if b.limit > 0 {
 		query = fmt.Sprintf("LIMIT %v", b.limit)
@@ -831,11 +908,11 @@ func (b *QueryBuilder[T]) limitString() string {
 	return query
 }
 
-func (b QueryBuilder[T]) Build() (string, []any) {
+func (b QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) Build() (string, []any) {
 	return b.BuildOffset(0, true)
 }
 
-func (b QueryBuilder[T]) BuildOffset(idx int, selectResults bool) (string, []any) {
+func (b QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) BuildOffset(idx int, selectResults bool) (string, []any) {
 	args := []any{}
 	var query string
 	switch b.operation {
@@ -893,7 +970,7 @@ func (b QueryBuilder[T]) BuildOffset(idx int, selectResults bool) (string, []any
 	return query_final, args
 }
 
-func (builder *QueryBuilder[T]) QueryOneExpect() (*T, *QueryBuilderError) {
+func (builder *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) QueryOneExpect() (*T, *QueryBuilderError) {
 	query, args := builder.Build()
 	rows, err := (*builder.db).Query(*builder.ctx, query, args...)
 	if err != nil {
@@ -913,7 +990,7 @@ func (builder *QueryBuilder[T]) QueryOneExpect() (*T, *QueryBuilderError) {
 	}
 	return nil, NotFoundError(builder.from)
 }
-func (builder *QueryBuilder[T]) QueryOne() (*T, *QueryBuilderError) {
+func (builder *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) QueryOne() (*T, *QueryBuilderError) {
 	query, args := builder.Build()
 	rows, err := (*builder.db).Query(*builder.ctx, query, args...)
 	if err != nil {
@@ -933,7 +1010,7 @@ func (builder *QueryBuilder[T]) QueryOne() (*T, *QueryBuilderError) {
 	}
 	return nil, nil
 }
-func (builder *QueryBuilder[T]) QueryUpdate(obj *T) *QueryBuilderError {
+func (builder *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) QueryUpdate(obj *T) *QueryBuilderError {
 	query, args := builder.Build()
 	rows, err := (*builder.db).Query(*builder.ctx, query, args...)
 	if err != nil {
@@ -952,7 +1029,7 @@ func (builder *QueryBuilder[T]) QueryUpdate(obj *T) *QueryBuilderError {
 	}
 	return nil
 }
-func (builder *QueryBuilder[T]) QueryMany() (*[]T, *QueryBuilderError) {
+func (builder *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) QueryMany() (*[]T, *QueryBuilderError) {
 	results := []T{}
 	query, args := builder.Build()
 	rows, err := (*builder.db).Query(*builder.ctx, query, args...)
@@ -974,7 +1051,7 @@ func (builder *QueryBuilder[T]) QueryMany() (*[]T, *QueryBuilderError) {
 	}
 	return &results, nil
 }
-func (builder *QueryBuilder[T]) QueryInTransaction(tx *pgx.Tx) *QueryBuilderError {
+func (builder *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) QueryInTransaction(tx *pgx.Tx) *QueryBuilderError {
 	query, args := builder.Build()
 	rows, err := (*tx).Query(*builder.ctx, query, args...)
 	if err != nil {
