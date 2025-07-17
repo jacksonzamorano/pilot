@@ -131,6 +131,26 @@ type KeyValue interface {
 	~string
 }
 
+type WhereComponent interface {
+	Build(query *string, args *[]any)
+}
+
+type ConditionWhereComponent struct {
+	value string
+}
+
+func (j ConditionWhereComponent) Build(query *string, args *[]any) {
+	*query += j.value
+}
+
+type StringWhereComponent struct {
+	value string
+}
+
+func (s StringWhereComponent) Build(query *string, args *[]any) {
+	*query += s.value
+}
+
 // QueryBuilder is the core struct that represents a SQL query being constructed.
 // It uses a fluent API pattern where methods can be chained together to build
 // complex queries. The builder is generic over type T, which represents the target
@@ -176,7 +196,7 @@ type QueryBuilder[T any, ReadKeys KeyValue, WriteKeys KeyValue, SortKeys KeyValu
 	from        string
 	joins       []QueryJoin
 	lastJoin    *QueryJoin
-	where       []QueryWhere
+	where       []WhereComponent
 	set         []map[string]SetField
 	joinsByName map[string]*QueryJoin
 	conversion  FromTableFn[T]
@@ -184,6 +204,7 @@ type QueryBuilder[T any, ReadKeys KeyValue, WriteKeys KeyValue, SortKeys KeyValu
 	sort        []QuerySort
 	limit       int
 	groupBy     *string
+	debug       bool
 }
 
 // Select creates a new QueryBuilder configured for SELECT operations on the specified table.
@@ -219,7 +240,7 @@ func Select[T any](table string, ctx *context.Context, db *pgxpool.Conn, convers
 		joins:       []QueryJoin{},
 		set:         []map[string]SetField{make(map[string]SetField, 0)},
 		lastJoin:    nil,
-		where:       []QueryWhere{},
+		where:       []WhereComponent{},
 		conversion:  conversion,
 		warn:        true,
 		sort:        []QuerySort{},
@@ -238,7 +259,7 @@ func SelectKeyed[T any, RK KeyValue, WK KeyValue, SK KeyValue](table string, ctx
 		joins:       []QueryJoin{},
 		set:         []map[string]SetField{make(map[string]SetField, 0)},
 		lastJoin:    nil,
-		where:       []QueryWhere{},
+		where:       []WhereComponent{},
 		conversion:  conversion,
 		warn:        true,
 		sort:        []QuerySort{},
@@ -280,7 +301,7 @@ func Update[T any](table string, ctx *context.Context, db *pgxpool.Conn, convers
 		joins:       []QueryJoin{},
 		set:         []map[string]SetField{make(map[string]SetField, 0)},
 		lastJoin:    nil,
-		where:       []QueryWhere{},
+		where:       []WhereComponent{},
 		conversion:  conversion,
 		warn:        true,
 		sort:        []QuerySort{},
@@ -298,7 +319,7 @@ func UpdateKeyed[T any, RK KeyValue, WK KeyValue, SK KeyValue](table string, ctx
 		joins:       []QueryJoin{},
 		set:         []map[string]SetField{make(map[string]SetField, 0)},
 		lastJoin:    nil,
-		where:       []QueryWhere{},
+		where:       []WhereComponent{},
 		conversion:  conversion,
 		warn:        true,
 		sort:        []QuerySort{},
@@ -346,7 +367,7 @@ func Insert[T any](table string, ctx *context.Context, db *pgxpool.Conn, convers
 		joins:       []QueryJoin{},
 		set:         []map[string]SetField{make(map[string]SetField, 0)},
 		lastJoin:    nil,
-		where:       []QueryWhere{},
+		where:       []WhereComponent{},
 		conversion:  conversion,
 		warn:        true,
 		sort:        []QuerySort{},
@@ -364,7 +385,7 @@ func InsertKeyed[T any, RK KeyValue, WK KeyValue, SK KeyValue](table string, ctx
 		joins:       []QueryJoin{},
 		set:         []map[string]SetField{make(map[string]SetField, 0)},
 		lastJoin:    nil,
-		where:       []QueryWhere{},
+		where:       []WhereComponent{},
 		conversion:  conversion,
 		warn:        true,
 		sort:        []QuerySort{},
@@ -410,7 +431,7 @@ func Delete[T any](table string, ctx *context.Context, db *pgxpool.Conn, convers
 		joins:       []QueryJoin{},
 		set:         []map[string]SetField{make(map[string]SetField, 0)},
 		lastJoin:    nil,
-		where:       []QueryWhere{},
+		where:       []WhereComponent{},
 		conversion:  conversion,
 		warn:        true,
 		sort:        []QuerySort{},
@@ -428,13 +449,18 @@ func DeleteKeyed[T any, RK KeyValue, WK KeyValue, SK KeyValue](table string, ctx
 		joins:       []QueryJoin{},
 		set:         []map[string]SetField{make(map[string]SetField, 0)},
 		lastJoin:    nil,
-		where:       []QueryWhere{},
+		where:       []WhereComponent{},
 		conversion:  conversion,
 		warn:        true,
 		sort:        []QuerySort{},
 		joinsByName: map[string]*QueryJoin{},
 		limit:       -1,
 	}
+}
+
+func (qb *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) Debug() *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys] {
+	qb.debug = true
+	return qb
 }
 
 // Set assigns a value to a field for INSERT or UPDATE operations. This method uses parameter
@@ -681,7 +707,16 @@ func (b *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) SelectFromAs(field Read
 	return b
 }
 func (b *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) Where(field ReadKeys, where string, arg any) *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys] {
-	b.where = append(b.where, QueryWhere{where: string(field) + " " + where, arg: arg, joinWith: ""})
+	if len(b.where) > 0 {
+		switch b.where[len(b.where)-1].(type) {
+		case QueryWhere:
+			b.where = append(b.where, ConditionWhereComponent{value: " AND "})
+		default:
+			break
+		}
+	}
+
+	b.where = append(b.where, QueryWhere{where: string(field) + " " + where, arg: arg})
 	return b
 }
 func (b *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) WhereEq(field ReadKeys, arg any) *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys] {
@@ -689,52 +724,52 @@ func (b *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) WhereEq(field ReadKeys,
 	return b
 }
 func (b *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) WhereNe(field ReadKeys, arg any) *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys] {
-	b.Where(field, " <> $", arg)
+	b.Where(field, "<> $", arg)
 	return b
 }
 func (b *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) WhereLt(field ReadKeys, arg any) *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys] {
-	b.Where(field, " < $", arg)
+	b.Where(field, "< $", arg)
 	return b
 }
 func (b *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) WhereLte(field ReadKeys, arg any) *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys] {
-	b.Where(field, " <= $", arg)
+	b.Where(field, "<= $", arg)
 	return b
 }
 func (b *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) WhereGt(field ReadKeys, arg any) *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys] {
-	b.Where(field, " > $", arg)
+	b.Where(field, "> $", arg)
 	return b
 }
 func (b *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) WhereGte(field ReadKeys, arg any) *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys] {
-	b.Where(field, " >= $", arg)
+	b.Where(field, ">= $", arg)
 	return b
 }
 func (b *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) WhereAny(field ReadKeys, arg any) *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys] {
-	b.Where(field, " = ANY($)", arg)
+	b.Where(field, "= ANY($)", arg)
 	return b
 }
 func (b *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) WhereNull(field ReadKeys) *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys] {
-	b.Where(field, " IS NULL", nil)
+	b.Where(field, "IS NULL", nil)
 	return b
 }
 func (b *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) WhereNotNull(field ReadKeys) *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys] {
-	b.Where(field, " IS NOT NULL", nil)
+	b.Where(field, "IS NOT NULL", nil)
 	return b
 }
 func (b *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) WhereLike(field ReadKeys, values any) *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys] {
-	b.Where(field, " LIKE $", values)
+	b.Where(field, "LIKE $", values)
 	return b
 }
 func (b *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) WhereNotLike(field ReadKeys, values any) *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys] {
-	b.Where(field, " NOT LIKE $", values)
+	b.Where(field, "NOT LIKE $", values)
 	return b
 }
 func (b *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) WhereLikeInsensitive(field ReadKeys, values any) *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys] {
-	b.Where(field, " ILIKE $", values)
+	b.Where(field, "ILIKE $", values)
 	return b
 }
 func (b *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) Or() *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys] {
 	if len(b.where) > 0 {
-		b.where[len(b.where)-1].joinWith = "OR"
+		b.where = append(b.where, StringWhereComponent{value: " OR "})
 	} else {
 		log.Fatalf("Or() called without any previous Where-style call")
 	}
@@ -742,7 +777,7 @@ func (b *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) Or() *QueryBuilder[T, R
 }
 func (b *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) And() *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys] {
 	if len(b.where) > 0 {
-		b.where[len(b.where)-1].joinWith = "AND"
+		b.where = append(b.where, StringWhereComponent{value: " AND "})
 	} else {
 		log.Fatalf("And() called without any previous Where-style call")
 	}
@@ -874,23 +909,23 @@ func (b *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) whereToString() (string
 		return "", nil
 	}
 	for whereIdx := range b.where {
-		query += b.where[whereIdx].where
-		if b.where[whereIdx].arg != nil {
-			args = append(args, b.where[whereIdx].arg)
-		}
-		if b.where[whereIdx].joinWith != "" {
-			query += " " + b.where[whereIdx].joinWith + " "
-		} else {
-			query += " AND "
-		}
+		b.where[whereIdx].Build(&query, &args)
 	}
-	return query[:len(query)-5], args
+	return query, args
+}
+func (b *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) StartGroup() *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys] {
+	b.where = append(b.where, StringWhereComponent{value: "("})
+	return b
+}
+func (b *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) EndGroup() *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys] {
+	b.where = append(b.where, StringWhereComponent{value: ")"})
+	return b
 }
 func (b *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) sortToString() string {
 	if len(b.sort) == 0 {
 		return ""
 	}
-	query := "ORDER BY "
+	query := " ORDER BY"
 	for sortIdx := range b.sort {
 		query += " "
 		query += b.sort[sortIdx].field
@@ -903,7 +938,7 @@ func (b *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) sortToString() string {
 func (b *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) limitString() string {
 	query := ""
 	if b.limit > 0 {
-		query = fmt.Sprintf("LIMIT %v", b.limit)
+		query = fmt.Sprintf(" LIMIT %v", b.limit)
 	}
 	return query
 }
@@ -923,7 +958,7 @@ func (b QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) BuildOffset(idx int, sel
 		if b.groupBy != nil {
 			groupBy = " GROUP BY " + *b.groupBy
 		}
-		query = fmt.Sprintf("SELECT %s FROM %s %s %s %v %s %s", b.selectToString(), b.from, b.joinToString(), whereQuery, b.sortToString(), b.limitString(), groupBy)
+		query = fmt.Sprintf("SELECT %s FROM %s %s%s%v%s%s", b.selectToString(), b.from, b.joinToString(), whereQuery, b.sortToString(), b.limitString(), groupBy)
 	case "UPDATE":
 		updateQuery, updateArgs := b.setToUpdateString()
 		whereQuery, whereArgs := b.whereToString()
@@ -933,7 +968,7 @@ func (b QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) BuildOffset(idx int, sel
 		if !selectResults {
 			query = innerQuery
 		} else {
-			query = fmt.Sprintf("WITH _res AS (%v RETURNING *) SELECT %v FROM _res AS %v %v %v", innerQuery, b.selectToString(), b.from, b.joinToString(), b.sortToString())
+			query = fmt.Sprintf("WITH _res AS (%v RETURNING *) SELECT %v FROM _res AS %v%v%v", innerQuery, b.selectToString(), b.from, b.joinToString(), b.sortToString())
 		}
 	case "INSERT":
 		insertQuery, insertArgString, insertArgs := b.setToInsertString()
@@ -942,7 +977,7 @@ func (b QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) BuildOffset(idx int, sel
 		if !selectResults {
 			query = innerQuery
 		} else {
-			query = fmt.Sprintf("WITH _res AS (%v RETURNING *) SELECT %v FROM _res AS %v %v %v", innerQuery, b.selectToString(), b.from, b.joinToString(), b.sortToString())
+			query = fmt.Sprintf("WITH _res AS (%v RETURNING *) SELECT %v FROM _res AS %v%v%v", innerQuery, b.selectToString(), b.from, b.joinToString(), b.sortToString())
 		}
 	case "DELETE":
 		whereQuery, whereArgs := b.whereToString()
@@ -951,7 +986,7 @@ func (b QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) BuildOffset(idx int, sel
 		if !selectResults {
 			query = innerQuery
 		} else {
-			query = fmt.Sprintf("WITH _res AS (%v RETURNING *) SELECT %v FROM _res AS %v %v %v", innerQuery, b.selectToString(), b.from, b.joinToString(), b.sortToString())
+			query = fmt.Sprintf("WITH _res AS (%v RETURNING *) SELECT %v FROM _res AS %v%v%v", innerQuery, b.selectToString(), b.from, b.joinToString(), b.sortToString())
 		}
 	}
 	query_final := ""
@@ -966,6 +1001,9 @@ func (b QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) BuildOffset(idx int, sel
 	}
 	if b.warn && len(b.where) == 0 && (b.operation == "UPDATE" || b.operation == "DELETE") {
 		log.Fatal("Attempted to run a query with no where clause. This is probably not what you want. Override with .Force()")
+	}
+	if b.debug {
+		log.Printf("[QUERY]: '%s'", query_final)
 	}
 	return query_final, args
 }
@@ -1029,12 +1067,12 @@ func (builder *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) QueryUpdate(obj *
 	}
 	return nil
 }
-func (builder *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) QueryMany() (*[]T, *QueryBuilderError) {
+func (builder *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) QueryMany() ([]T, *QueryBuilderError) {
 	results := []T{}
 	query, args := builder.Build()
 	rows, err := (*builder.db).Query(*builder.ctx, query, args...)
 	if err != nil {
-		return &results, PostgresError(builder.from, err)
+		return results, PostgresError(builder.from, err)
 	}
 	defer rows.Close()
 	for rows.Next() {
@@ -1042,14 +1080,14 @@ func (builder *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) QueryMany() (*[]T
 		err := builder.conversion(rows, &value)
 		if err != nil {
 			log.Println(err)
-			return &results, PostgresError(builder.from, err)
+			return results, PostgresError(builder.from, err)
 		}
 		results = append(results, value)
 	}
 	if rows.Err() != nil {
-		return &results, PostgresError(builder.from, rows.Err())
+		return results, PostgresError(builder.from, rows.Err())
 	}
-	return &results, nil
+	return results, nil
 }
 func (builder *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) QueryInTransaction(tx *pgx.Tx) *QueryBuilderError {
 	query, args := builder.Build()
@@ -1159,9 +1197,15 @@ type QueryJoin struct {
 }
 
 type QueryWhere struct {
-	where    string
-	arg      any
-	joinWith string
+	where string
+	arg   any
+}
+
+func (q QueryWhere) Build(query *string, args *[]any) {
+	*query += q.where
+	if q.arg != nil {
+		*args = append(*args, q.arg)
+	}
 }
 
 type QuerySort struct {
