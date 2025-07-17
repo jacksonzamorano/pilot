@@ -863,7 +863,7 @@ func (b *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) joinToString() string {
 		query += " "
 	}
 	if len(query) > 1 {
-		return query[:len(query)-1]
+		return query
 	} else {
 		return query
 	}
