@@ -202,6 +202,7 @@ type QueryBuilder[T any, ReadKeys KeyValue, WriteKeys KeyValue, SortKeys KeyValu
 	conversion  FromTableFn[T]
 	warn        bool
 	sort        []QuerySort
+	sortArgs    []any
 	limit       int
 	groupBy     *string
 	debug       bool
@@ -787,8 +788,18 @@ func (b *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) SortAsc(field SortKeys)
 	b.sort = append(b.sort, QuerySort{field: string(field), order: "ASC"})
 	return b
 }
+func (b *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) SortAscExpression(expr string, args ...any) *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys] {
+	b.sort = append(b.sort, QuerySort{field: expr, order: "ASC"})
+	b.sortArgs = append(b.sortArgs, args)
+	return b
+}
 func (b *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) SortDesc(field SortKeys) *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys] {
 	b.sort = append(b.sort, QuerySort{field: string(field), order: "DESC"})
+	return b
+}
+func (b *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) SortDescExpression(expr string, args ...any) *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys] {
+	b.sort = append(b.sort, QuerySort{field: expr, order: "ASC"})
+	b.sortArgs = append(b.sortArgs, args)
 	return b
 }
 func (b *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) Limit(num int) *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys] {
@@ -1005,6 +1016,7 @@ func (b QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) BuildOffset(idx int, sel
 	if b.debug {
 		log.Printf("[QUERY]: '%s'", query_final)
 	}
+	args = append(args, b.sortArgs...)
 	return query_final, args
 }
 
