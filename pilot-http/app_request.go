@@ -19,7 +19,7 @@ import (
 type RouteRequest[T any] struct {
 	Request  *HttpRequest
 	Database *pgxpool.Conn
-	Context  *context.Context
+	Context  context.Context
 	State    *T
 }
 

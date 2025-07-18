@@ -218,7 +218,7 @@ ReqLoop:
 			var routeState RouteState
 
 			routeData := RouteRequest[RouteState]{
-				Context:  &cn,
+				Context:  cn,
 				Request:  request,
 				Database: db,
 				State:    &routeState,
