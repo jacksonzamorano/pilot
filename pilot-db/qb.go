@@ -790,7 +790,7 @@ func (b *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) SortAsc(field SortKeys)
 }
 func (b *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) SortAscExpression(expr string, args ...any) *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys] {
 	b.sort = append(b.sort, QuerySort{field: expr, order: "ASC"})
-	b.sortArgs = append(b.sortArgs, args)
+	b.sortArgs = append(b.sortArgs, args...)
 	return b
 }
 func (b *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) SortDesc(field SortKeys) *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys] {
@@ -798,8 +798,8 @@ func (b *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) SortDesc(field SortKeys
 	return b
 }
 func (b *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) SortDescExpression(expr string, args ...any) *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys] {
-	b.sort = append(b.sort, QuerySort{field: expr, order: "ASC"})
-	b.sortArgs = append(b.sortArgs, args)
+	b.sort = append(b.sort, QuerySort{field: expr, order: "DESC"})
+	b.sortArgs = append(b.sortArgs, args...)
 	return b
 }
 func (b *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) Limit(num int) *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys] {
@@ -1013,10 +1013,10 @@ func (b QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) BuildOffset(idx int, sel
 	if b.warn && len(b.where) == 0 && (b.operation == "UPDATE" || b.operation == "DELETE") {
 		log.Fatal("Attempted to run a query with no where clause. This is probably not what you want. Override with .Force()")
 	}
+	args = append(args, b.sortArgs...)
 	if b.debug {
 		log.Printf("[QUERY]: '%s'", query_final)
 	}
-	args = append(args, b.sortArgs...)
 	return query_final, args
 }
 
