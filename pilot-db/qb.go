@@ -1010,7 +1010,7 @@ func (b QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) BuildOffset(idx int, sel
 
 func (builder *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) QueryOneExpect() (*T, *QueryBuilderError) {
 	query, args := builder.Build()
-	rows, err := (*builder.db).Query(*builder.ctx, query, args...)
+	rows, err := (*builder.db).Query(builder.ctx, query, args...)
 	if err != nil {
 		return nil, PostgresError(builder.from, err)
 	}
@@ -1030,7 +1030,7 @@ func (builder *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) QueryOneExpect() 
 }
 func (builder *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) QueryOne() (*T, *QueryBuilderError) {
 	query, args := builder.Build()
-	rows, err := (*builder.db).Query(*builder.ctx, query, args...)
+	rows, err := (*builder.db).Query(builder.ctx, query, args...)
 	if err != nil {
 		return nil, PostgresError(builder.from, err)
 	}
@@ -1050,7 +1050,7 @@ func (builder *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) QueryOne() (*T, *
 }
 func (builder *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) QueryUpdate(obj *T) *QueryBuilderError {
 	query, args := builder.Build()
-	rows, err := (*builder.db).Query(*builder.ctx, query, args...)
+	rows, err := (*builder.db).Query(builder.ctx, query, args...)
 	if err != nil {
 		return PostgresError(builder.from, err)
 	}
@@ -1070,7 +1070,7 @@ func (builder *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) QueryUpdate(obj *
 func (builder *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) QueryMany() ([]T, *QueryBuilderError) {
 	results := []T{}
 	query, args := builder.Build()
-	rows, err := (*builder.db).Query(*builder.ctx, query, args...)
+	rows, err := (*builder.db).Query(builder.ctx, query, args...)
 	if err != nil {
 		return results, PostgresError(builder.from, err)
 	}
@@ -1091,7 +1091,7 @@ func (builder *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) QueryMany() ([]T,
 }
 func (builder *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) QueryInTransaction(tx *pgx.Tx) *QueryBuilderError {
 	query, args := builder.Build()
-	rows, err := (*tx).Query(*builder.ctx, query, args...)
+	rows, err := (*tx).Query(builder.ctx, query, args...)
 	if err != nil {
 		return PostgresError(builder.from, err)
 	}
