@@ -189,7 +189,7 @@ func (s StringWhereComponent) Build(query *string, args *[]any) {
 //	    SortDesc("created_at").
 //	    Limit(10)
 type QueryBuilder[T any, ReadKeys KeyValue, WriteKeys KeyValue, SortKeys KeyValue] struct {
-	ctx         *context.Context
+	ctx         context.Context
 	db          *pgxpool.Conn
 	operation   string
 	fields      []SelectField
@@ -230,7 +230,7 @@ type QueryBuilder[T any, ReadKeys KeyValue, WriteKeys KeyValue, SortKeys KeyValu
 //	    Where("active", "= $", true)
 //
 //	users, err := query.QueryMany(ctx, conn)
-func Select[T any](table string, ctx *context.Context, db *pgxpool.Conn, conversion FromTableFn[T]) *QueryBuilder[T, string, string, string] {
+func Select[T any](table string, ctx context.Context, db *pgxpool.Conn, conversion FromTableFn[T]) *QueryBuilder[T, string, string, string] {
 	return &QueryBuilder[T, string, string, string]{
 		ctx:         ctx,
 		db:          db,
@@ -249,7 +249,7 @@ func Select[T any](table string, ctx *context.Context, db *pgxpool.Conn, convers
 	}
 }
 
-func SelectKeyed[T any, RK KeyValue, WK KeyValue, SK KeyValue](table string, ctx *context.Context, db *pgxpool.Conn, conversion FromTableFn[T]) *QueryBuilder[T, RK, WK, SK] {
+func SelectKeyed[T any, RK KeyValue, WK KeyValue, SK KeyValue](table string, ctx context.Context, db *pgxpool.Conn, conversion FromTableFn[T]) *QueryBuilder[T, RK, WK, SK] {
 	return &QueryBuilder[T, RK, WK, SK]{
 		ctx:         ctx,
 		db:          db,
@@ -291,7 +291,7 @@ func SelectKeyed[T any, RK KeyValue, WK KeyValue, SK KeyValue](table string, ctx
 //	    Where("id", "= $", 123)
 //
 //	err := query.QueryInTransaction(ctx, tx)
-func Update[T any](table string, ctx *context.Context, db *pgxpool.Conn, conversion FromTableFn[T]) *QueryBuilder[T, string, string, string] {
+func Update[T any](table string, ctx context.Context, db *pgxpool.Conn, conversion FromTableFn[T]) *QueryBuilder[T, string, string, string] {
 	return &QueryBuilder[T, string, string, string]{
 		ctx:         ctx,
 		db:          db,
@@ -309,7 +309,7 @@ func Update[T any](table string, ctx *context.Context, db *pgxpool.Conn, convers
 		limit:       -1,
 	}
 }
-func UpdateKeyed[T any, RK KeyValue, WK KeyValue, SK KeyValue](table string, ctx *context.Context, db *pgxpool.Conn, conversion FromTableFn[T]) *QueryBuilder[T, RK, WK, SK] {
+func UpdateKeyed[T any, RK KeyValue, WK KeyValue, SK KeyValue](table string, ctx context.Context, db *pgxpool.Conn, conversion FromTableFn[T]) *QueryBuilder[T, RK, WK, SK] {
 	return &QueryBuilder[T, RK, WK, SK]{
 		ctx:         ctx,
 		db:          db,
@@ -357,7 +357,7 @@ func UpdateKeyed[T any, RK KeyValue, WK KeyValue, SK KeyValue](table string, ctx
 //	bulkQuery := pilot_db.Insert("users", userFromRow).
 //	    Set("name", "User 1").Set("email", "user1@example.com").  // First row
 //	    Set("name", "User 2").Set("email", "user2@example.com")   // Second row
-func Insert[T any](table string, ctx *context.Context, db *pgxpool.Conn, conversion FromTableFn[T]) *QueryBuilder[T, string, string, string] {
+func Insert[T any](table string, ctx context.Context, db *pgxpool.Conn, conversion FromTableFn[T]) *QueryBuilder[T, string, string, string] {
 	return &QueryBuilder[T, string, string, string]{
 		ctx:         ctx,
 		db:          db,
@@ -375,7 +375,7 @@ func Insert[T any](table string, ctx *context.Context, db *pgxpool.Conn, convers
 		limit:       -1,
 	}
 }
-func InsertKeyed[T any, RK KeyValue, WK KeyValue, SK KeyValue](table string, ctx *context.Context, db *pgxpool.Conn, conversion FromTableFn[T]) *QueryBuilder[T, RK, WK, SK] {
+func InsertKeyed[T any, RK KeyValue, WK KeyValue, SK KeyValue](table string, ctx context.Context, db *pgxpool.Conn, conversion FromTableFn[T]) *QueryBuilder[T, RK, WK, SK] {
 	return &QueryBuilder[T, RK, WK, SK]{
 		ctx:         ctx,
 		db:          db,
@@ -421,7 +421,7 @@ func InsertKeyed[T any, RK KeyValue, WK KeyValue, SK KeyValue](table string, ctx
 //	// Force delete all records (dangerous!)
 //	query := pilot_db.Delete("temp_data", tempDataFromRow).
 //	    Force()  // Required to delete without WHERE clause
-func Delete[T any](table string, ctx *context.Context, db *pgxpool.Conn, conversion FromTableFn[T]) *QueryBuilder[T, string, string, string] {
+func Delete[T any](table string, ctx context.Context, db *pgxpool.Conn, conversion FromTableFn[T]) *QueryBuilder[T, string, string, string] {
 	return &QueryBuilder[T, string, string, string]{
 		ctx:         ctx,
 		db:          db,
@@ -439,7 +439,7 @@ func Delete[T any](table string, ctx *context.Context, db *pgxpool.Conn, convers
 		limit:       -1,
 	}
 }
-func DeleteKeyed[T any, RK KeyValue, WK KeyValue, SK KeyValue](table string, ctx *context.Context, db *pgxpool.Conn, conversion FromTableFn[T]) *QueryBuilder[T, RK, WK, SK] {
+func DeleteKeyed[T any, RK KeyValue, WK KeyValue, SK KeyValue](table string, ctx context.Context, db *pgxpool.Conn, conversion FromTableFn[T]) *QueryBuilder[T, RK, WK, SK] {
 	return &QueryBuilder[T, RK, WK, SK]{
 		ctx:         ctx,
 		db:          db,
