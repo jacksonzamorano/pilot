@@ -825,6 +825,14 @@ func (b *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) InnerJoinAs(table strin
 	b.joinsByName[alias] = b.lastJoin
 	return b
 }
+func (b *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) JoinAs(jointype string, ftable string, lbase string, alias string, local string, foreign string) *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys] {
+	loc := lbase
+	where := fmt.Sprintf("%v.%v = %v.%v", loc, local, alias, foreign)
+	b.joins = append(b.joins, QueryJoin{joinKind: jointype, table: ftable, where: where, alias: alias})
+	b.lastJoin = &b.joins[len(b.joins)-1]
+	b.joinsByName[alias] = b.lastJoin
+	return b
+}
 func (b *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) GroupBy(field string) *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys] {
 	b.groupBy = &field
 	return b
