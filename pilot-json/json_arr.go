@@ -3,6 +3,8 @@ package pilot_json
 import (
 	"errors"
 	"strconv"
+
+	"github.com/google/uuid"
 )
 
 type JsonArray struct {
@@ -154,6 +156,18 @@ func (json *JsonArray) GetBool(index int) (*bool, *JsonFieldError) {
 		return nil, InvalidFieldError(strconv.Itoa(index), "bool")
 	}
 	return &b, nil
+}
+
+func (json *JsonArray) GetUuid(index int) (*uuid.UUID, *JsonFieldError) {
+	d, verr := json.GetTrimmedData(index)
+	if verr != nil {
+		return nil, verr
+	}
+	id, err := uuid.ParseBytes(d)
+	if err != nil {
+		return nil, InvalidFieldError(strconv.Itoa(index), "uuid")
+	}
+	return &id, nil
 }
 
 func (json *JsonArray) GetObject(index int) (*JsonObject, *JsonFieldError) {
