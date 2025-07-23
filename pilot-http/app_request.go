@@ -29,6 +29,7 @@ type HttpRequest struct {
 	Method      HttpMethod
 	Body        []byte
 	Headers     map[string]string
+	IpAddress   string
 	_tempMap    *map[string]string
 }
 
@@ -132,6 +133,7 @@ func ParseRequest(incoming *net.Conn) *HttpRequest {
 		Body:        nil,
 		Headers:     make(map[string]string),
 		QueryString: "",
+		IpAddress:   (*incoming).RemoteAddr().String(),
 	}
 
 	bufReader := bufio.NewReader(*incoming)
