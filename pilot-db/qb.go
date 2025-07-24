@@ -193,6 +193,7 @@ type QueryBuilder[T any, ReadKeys KeyValue, WriteKeys KeyValue, SortKeys KeyValu
 	db          *pgxpool.Conn
 	operation   string
 	fields      []SelectField
+	distinctOn  string
 	from        string
 	joins       []QueryJoin
 	lastJoin    *QueryJoin
@@ -708,6 +709,14 @@ func (b *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) SelectFromAs(field Read
 	b.fields = append(b.fields, SelectField{string(field), join.alias, as, nil})
 	return b
 }
+func (b *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) DistinctOn(fields ...ReadKeys) *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys] {
+	for fIdx := range fields {
+		b.distinctOn += string(fields[fIdx])
+		b.distinctOn += ","
+	}
+	b.distinctOn = b.distinctOn[:len(b.distinctOn)-1]
+	return b
+}
 func (b *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) Where(field ReadKeys, where string, arg any) *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys] {
 	if len(b.where) > 0 {
 		switch b.where[len(b.where)-1].(type) {
@@ -869,6 +878,11 @@ func (b *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) Force() *QueryBuilder[T
 }
 func (b *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) selectToString() string {
 	var query string
+	if b.distinctOn != "" {
+		query += "DISTINCT ON ("
+		query += b.distinctOn
+		query += ") "
+	}
 	for _, field := range b.fields {
 		if field.expr == nil {
 			if len(field.table) > 0 {
