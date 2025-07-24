@@ -198,6 +198,7 @@ type QueryBuilder[T any, ReadKeys KeyValue, WriteKeys KeyValue, SortKeys KeyValu
 	lastJoin    *QueryJoin
 	where       []WhereComponent
 	set         []map[string]SetField
+	joinArgs    []any
 	joinsByName map[string]*QueryJoin
 	conversion  FromTableFn[T]
 	warn        bool
@@ -648,8 +649,8 @@ func (b *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) SelectAs(field ReadKeys
 //	    Select("name").
 //	    SelectExprFromBase("age_years", "EXTRACT(YEAR FROM AGE(birth_date))").
 //	    SelectExprFromBase("full_name", "CONCAT(first_name, ' ', last_name)")
-func (b *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) SelectExprFromBase(field ReadKeys, expr string) *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys] {
-	b.fields = append(b.fields, SelectField{string(field), b.from, "", &expr})
+func (b *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) SelectExprFromBase(field string, expr string) *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys] {
+	b.fields = append(b.fields, SelectField{string(field), "", "", &expr})
 	return b
 }
 
@@ -825,6 +826,13 @@ func (b *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) InnerJoinAs(table strin
 	b.joinsByName[alias] = b.lastJoin
 	return b
 }
+func (b *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) CustomJoin(jointype string, ftable string, alias string, condition string, args ...any) *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys] {
+	b.joins = append(b.joins, QueryJoin{joinKind: jointype, table: ftable, where: condition, alias: alias})
+	b.lastJoin = &b.joins[len(b.joins)-1]
+	b.joinsByName[alias] = b.lastJoin
+	b.joinArgs = append(b.joinArgs, args...)
+	return b
+}
 func (b *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) JoinAs(jointype string, ftable string, lbase string, alias string, local string, foreign string) *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys] {
 	loc := lbase
 	where := fmt.Sprintf("%v.%v = %v.%v", loc, local, alias, foreign)
@@ -863,7 +871,9 @@ func (b *QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) selectToString() string
 	var query string
 	for _, field := range b.fields {
 		if field.expr == nil {
-			query += field.table + "."
+			if len(field.table) > 0 {
+				query += field.table + "."
+			}
 			query += field.name
 			if field.as != "" {
 				query += " AS " + field.as
@@ -968,6 +978,7 @@ func (b QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) Build() (string, []any) 
 
 func (b QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) BuildOffset(idx int, selectResults bool) (string, []any) {
 	args := []any{}
+	args = append(args, b.joinArgs...)
 	var query string
 	switch b.operation {
 	case "SELECT":
@@ -977,35 +988,47 @@ func (b QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) BuildOffset(idx int, sel
 		if b.groupBy != nil {
 			groupBy = " GROUP BY " + *b.groupBy
 		}
-		query = fmt.Sprintf("SELECT %s FROM %s %s%s%v%s%s", b.selectToString(), b.from, b.joinToString(), whereQuery, b.sortToString(), b.limitString(), groupBy)
+		query = fmt.Sprintf("SELECT %s FROM %s %s%s%v%s%s", b.selectToString(), b.from, b.joinToString(), whereQuery, groupBy, b.sortToString(), b.limitString())
 	case "UPDATE":
 		updateQuery, updateArgs := b.setToUpdateString()
 		whereQuery, whereArgs := b.whereToString()
 		args = append(args, updateArgs...)
 		args = append(args, whereArgs...)
 		innerQuery := fmt.Sprintf("UPDATE %s SET %s %v", b.from, updateQuery, whereQuery)
+		groupBy := ""
+		if b.groupBy != nil {
+			groupBy = " GROUP BY " + *b.groupBy
+		}
 		if !selectResults {
 			query = innerQuery
 		} else {
-			query = fmt.Sprintf("WITH _res AS (%v RETURNING *) SELECT %v FROM _res AS %v%v%v", innerQuery, b.selectToString(), b.from, b.joinToString(), b.sortToString())
+			query = fmt.Sprintf("WITH _res AS (%v RETURNING *) SELECT %v FROM _res AS %v%v%v%v", innerQuery, b.selectToString(), b.from, b.joinToString(), groupBy, b.sortToString())
 		}
 	case "INSERT":
 		insertQuery, insertArgString, insertArgs := b.setToInsertString()
 		args = append(args, insertArgs...)
 		innerQuery := fmt.Sprintf("INSERT INTO %s (%s) VALUES %s", b.from, insertQuery, insertArgString)
+		groupBy := ""
+		if b.groupBy != nil {
+			groupBy = " GROUP BY " + *b.groupBy
+		}
 		if !selectResults {
 			query = innerQuery
 		} else {
-			query = fmt.Sprintf("WITH _res AS (%v RETURNING *) SELECT %v FROM _res AS %v%v%v", innerQuery, b.selectToString(), b.from, b.joinToString(), b.sortToString())
+			query = fmt.Sprintf("WITH _res AS (%v RETURNING *) SELECT %v FROM _res AS %v%v%v%v", innerQuery, b.selectToString(), b.from, b.joinToString(), groupBy, b.sortToString())
 		}
 	case "DELETE":
 		whereQuery, whereArgs := b.whereToString()
 		args = append(args, whereArgs...)
 		innerQuery := fmt.Sprintf("DELETE FROM %s %v", b.from, whereQuery)
+		groupBy := ""
+		if b.groupBy != nil {
+			groupBy = " GROUP BY " + *b.groupBy
+		}
 		if !selectResults {
 			query = innerQuery
 		} else {
-			query = fmt.Sprintf("WITH _res AS (%v RETURNING *) SELECT %v FROM _res AS %v%v%v", innerQuery, b.selectToString(), b.from, b.joinToString(), b.sortToString())
+			query = fmt.Sprintf("WITH _res AS (%v RETURNING *) SELECT %v FROM _res AS %v%v%v%v", innerQuery, b.selectToString(), b.from, b.joinToString(), groupBy, b.sortToString())
 		}
 	}
 	query_final := ""
@@ -1024,6 +1047,9 @@ func (b QueryBuilder[T, ReadKeys, WriteKeys, SortKeys]) BuildOffset(idx int, sel
 	args = append(args, b.sortArgs...)
 	if b.debug {
 		log.Printf("[QUERY]: '%s'", query_final)
+		for argIdx := range args {
+			log.Printf("[ARG] %d: '%v'", argIdx, args[argIdx])
+		}
 	}
 	return query_final, args
 }
