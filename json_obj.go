@@ -161,10 +161,10 @@ func NewJsonObject() *JsonObject {
 }
 
 type JsonReadable interface {
-	FromJson() *JsonFieldError
+	FromJson() error
 }
 
-func (json *JsonObject) GetString(key string) (*string, *JsonFieldError) {
+func (json *JsonObject) GetString(key string) (*string, error) {
 	val, ok := (*json).data[key]
 	if ok {
 		str := string(val[1 : len(val)-1])
@@ -173,7 +173,7 @@ func (json *JsonObject) GetString(key string) (*string, *JsonFieldError) {
 	return nil, NoFieldError(key)
 }
 
-func (json *JsonObject) GetInt32(key string) (*int32, *JsonFieldError) {
+func (json *JsonObject) GetInt32(key string) (*int32, error) {
 	val, ok := (*json).data[key]
 	if ok {
 		i, err := strconv.ParseInt(string(val), 10, 32)
@@ -186,7 +186,7 @@ func (json *JsonObject) GetInt32(key string) (*int32, *JsonFieldError) {
 	return nil, NoFieldError(key)
 }
 
-func (json *JsonObject) GetInt64(key string) (*int64, *JsonFieldError) {
+func (json *JsonObject) GetInt64(key string) (*int64, error) {
 	val, ok := (*json).data[key]
 	if ok {
 		i, err := strconv.ParseInt(string(val), 10, 64)
@@ -198,7 +198,7 @@ func (json *JsonObject) GetInt64(key string) (*int64, *JsonFieldError) {
 	return nil, NoFieldError(key)
 }
 
-func (json *JsonObject) GetFloat32(key string) (*float32, *JsonFieldError) {
+func (json *JsonObject) GetFloat32(key string) (*float32, error) {
 	val, ok := (*json).data[key]
 	if ok {
 		str := string(val)
@@ -212,7 +212,7 @@ func (json *JsonObject) GetFloat32(key string) (*float32, *JsonFieldError) {
 	return nil, NoFieldError(key)
 }
 
-func (json *JsonObject) GetFloat64(key string) (*float64, *JsonFieldError) {
+func (json *JsonObject) GetFloat64(key string) (*float64, error) {
 	val, ok := (*json).data[key]
 	if ok {
 		str := string(val)
@@ -225,7 +225,7 @@ func (json *JsonObject) GetFloat64(key string) (*float64, *JsonFieldError) {
 	return nil, NoFieldError(key)
 }
 
-func (json *JsonObject) GetBool(key string) (*bool, *JsonFieldError) {
+func (json *JsonObject) GetBool(key string) (*bool, error) {
 	val, ok := (*json).data[key]
 	if ok {
 		str := string(val)
@@ -238,7 +238,7 @@ func (json *JsonObject) GetBool(key string) (*bool, *JsonFieldError) {
 	return nil, NoFieldError(key)
 }
 
-func (json *JsonObject) GetObject(key string) (*JsonObject, *JsonFieldError) {
+func (json *JsonObject) GetObject(key string) (*JsonObject, error) {
 	val, ok := (*json).data[key]
 	if ok {
 		obj := NewJsonObject()
@@ -251,7 +251,7 @@ func (json *JsonObject) GetObject(key string) (*JsonObject, *JsonFieldError) {
 	return nil, NoFieldError(key)
 }
 
-func (json *JsonObject) GetArray(key string) (*JsonArray, *JsonFieldError) {
+func (json *JsonObject) GetArray(key string) (*JsonArray, error) {
 	val, ok := (*json).data[key]
 	if ok {
 		arr := NewJsonArray()
@@ -264,7 +264,7 @@ func (json *JsonObject) GetArray(key string) (*JsonArray, *JsonFieldError) {
 	return nil, NoFieldError(key)
 }
 
-func (json *JsonObject) GetData(key string) (*[]byte, *JsonFieldError) {
+func (json *JsonObject) GetData(key string) (*[]byte, error) {
 	val, ok := (*json).data[key]
 	if ok {
 		return &val, nil
@@ -272,7 +272,7 @@ func (json *JsonObject) GetData(key string) (*[]byte, *JsonFieldError) {
 	return nil, NoFieldError(key)
 }
 
-func (json *JsonObject) GetTime(key string) (*time.Time, *JsonFieldError) {
+func (json *JsonObject) GetTime(key string) (*time.Time, error) {
 	val, ok := (*json).data[key]
 	if ok {
 		if len(val) < 2 {
@@ -287,7 +287,7 @@ func (json *JsonObject) GetTime(key string) (*time.Time, *JsonFieldError) {
 	return nil, NoFieldError(key)
 }
 
-func (json *JsonObject) GetUuid(key string) (*uuid.UUID, *JsonFieldError) {
+func (json *JsonObject) GetUuid(key string) (*uuid.UUID, error) {
 	val, ok := (*json).data[key]
 	if ok {
 		uuid, err := uuid.ParseBytes(val)
