@@ -1,16 +1,16 @@
-package pilot_http
+package pilot
 
 type HttpMethod string
 type RequestHandler[RouteState any] func(RouteState, *HttpRequest) *HttpResponse
 
 const (
 	Get     HttpMethod = "GET"
-	Post               = "POST"
-	Put                = "PUT"
-	Patch              = "PATCH"
-	Delete             = "DELETE"
-	Options            = "OPTIONS"
-	None               = "NONE"
+	Post    HttpMethod = "POST"
+	Put     HttpMethod = "PUT"
+	Patch   HttpMethod = "PATCH"
+	Delete  HttpMethod = "DELETE"
+	Options HttpMethod = "OPTIONS"
+	None    HttpMethod = "NONE"
 )
 
 var (

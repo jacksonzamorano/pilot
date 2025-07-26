@@ -1,4 +1,4 @@
-// Package pilot_json provides a custom JSON parsing and validation library that offers
+// Package pilot provides a custom JSON parsing and validation library that offers
 // more granular control and better error handling than the standard encoding/json package.
 // This package is designed for scenarios where you need field-by-field validation,
 // custom error messages, and more control over the JSON parsing process.
@@ -19,13 +19,13 @@
 // Usage Example:
 //
 //	jsonData := []byte(`{"name":"John","age":30,"email":"john@example.com"}`)
-//	obj := pilot_json.NewJsonObject()
+//	obj := pilot.NewJsonObject()
 //	err := obj.Parse(&jsonData)
 //
 //	name, err := obj.GetString("name")
 //	age, err := obj.GetInt32("age")
 //	email, err := obj.GetString("email")
-package pilot_json
+package pilot
 
 import (
 	"errors"
@@ -57,7 +57,7 @@ import (
 // Example:
 //
 //	jsonData := []byte(`{"name":"John","age":30,"active":true}`)
-//	obj := pilot_json.NewJsonObject()
+//	obj := pilot.NewJsonObject()
 //	err := obj.Parse(&jsonData)
 //	if err != nil {
 //	    log.Printf("Failed to parse JSON: %v", err)
@@ -78,11 +78,11 @@ func (this *JsonObject) Parse(json *[]byte) error {
 	curly_delim := 0
 	square_delim := 0
 	for i < len((*json)) {
-		skipThrough(&(*json), &i, '"')
+		skipThrough(json, &i, '"')
 		keyStart = i
-		skipUntil(&(*json), &i, '"')
+		skipUntil(json, &i, '"')
 		keyEnd = i
-		skipToValue(&(*json), &i)
+		skipToValue(json, &i)
 		valueStart = i
 		for i < len((*json)) {
 			if (*json)[i-1] != '\\' && (*json)[i] == '"' {
@@ -128,7 +128,7 @@ func (this *JsonObject) Parse(json *[]byte) error {
 //
 // Example:
 //
-//	obj := pilot_json.NewJsonObject()
+//	obj := pilot.NewJsonObject()
 //	err := obj.Parse(&jsonBytes)
 //
 //	// Type-safe field access with error handling
@@ -149,7 +149,7 @@ type JsonObject struct {
 //
 // Example:
 //
-//	obj := pilot_json.NewJsonObject()
+//	obj := pilot.NewJsonObject()
 //	err := obj.Parse(&jsonData)
 //
 //	// Now you can access fields from the parsed JSON
@@ -158,6 +158,10 @@ func NewJsonObject() *JsonObject {
 	return &JsonObject{
 		data: make(map[string][]byte),
 	}
+}
+
+type JsonReadable interface {
+	FromJson() *JsonFieldError
 }
 
 func (json *JsonObject) GetString(key string) (*string, *JsonFieldError) {

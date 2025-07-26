@@ -1,8 +1,9 @@
-package pilot_http
+package pilot
 
 import (
 	"bufio"
 	"context"
+	"database/sql"
 	"fmt"
 	"io"
 	"log"
@@ -13,12 +14,11 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type RouteRequest[T any] struct {
 	Request  *HttpRequest
-	Database *pgxpool.Conn
+	Database *sql.DB
 	Context  context.Context
 	State    *T
 }
