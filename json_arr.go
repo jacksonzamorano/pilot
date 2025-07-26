@@ -17,15 +17,15 @@ func NewJsonArray() *JsonArray {
 	}
 }
 
-func (this *JsonArray) Parse(json *[]byte) error {
+func (this *JsonArray) Parse(json []byte) error {
 	i := 0
 	for {
-		if (*json)[i] == '[' {
+		if (json)[i] == '[' {
 			i++
 			break
 		}
 		i++
-		if i == len(*json) {
+		if i == len(json) {
 			return errors.New("Expected array")
 		}
 	}
@@ -33,30 +33,30 @@ func (this *JsonArray) Parse(json *[]byte) error {
 	curly_delim := 0
 	square_delim := 0
 	quote := false
-	for i < len((*json))-1 {
+	for i < len(json)-1 {
 		valueStart = i
-		for i < len((*json))-1 {
-			if (i < 1 || (*json)[i-1] != '\\') && (*json)[i] == '"' {
+		for i < len(json)-1 {
+			if (i < 1 || json[i-1] != '\\') && json[i] == '"' {
 				quote = !quote
 			}
-			if !quote && (*json)[i] == '{' {
+			if !quote && json[i] == '{' {
 				curly_delim++
 			}
-			if !quote && (*json)[i] == '}' {
+			if !quote && json[i] == '}' {
 				curly_delim--
 			}
-			if !quote && (*json)[i] == '[' {
+			if !quote && json[i] == '[' {
 				square_delim++
 			}
-			if !quote && (*json)[i] == ']' {
+			if !quote && json[i] == ']' {
 				square_delim--
 			}
-			if !quote && curly_delim <= 0 && square_delim <= 0 && ((*json)[i] == ',' || (*json)[i] == ']') {
+			if !quote && curly_delim <= 0 && square_delim <= 0 && (json[i] == ',' || json[i] == ']') {
 				break
 			}
 			i++
 		}
-		this.data = append(this.data, (*json)[valueStart:i])
+		this.data = append(this.data, json[valueStart:i])
 		i++
 	}
 	return nil
@@ -189,7 +189,7 @@ func (json *JsonArray) GetArray(index int) (*JsonArray, error) {
 	}
 	val := (*json).data[index]
 	arr := NewJsonArray()
-	err := arr.Parse(&val)
+	err := arr.Parse(val)
 	if err != nil {
 		return nil, CouldNotParseError(strconv.Itoa(index))
 	}

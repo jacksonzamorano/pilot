@@ -5,7 +5,7 @@ import "testing"
 func TestJsonArr(t *testing.T) {
 	json := []byte(`[1,2,3,4]`)
 	obj := NewJsonArray()
-	err := obj.Parse(&json)
+	err := obj.Parse(json)
 	if err != nil {
 		t.Error(err)
 	}

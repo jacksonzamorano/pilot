@@ -10,7 +10,7 @@ type SampleObject struct {
 func TestJsonObject(t *testing.T) {
 	json := []byte(`{"name":"John","age":30,"friends":[{"name":"Bob","age":20},{"name":"Alice","age":21}]}`)
 	obj := NewJsonObject()
-	err := obj.Parse(&json)
+	err := obj.Parse(json)
 	if err != nil {
 		t.Error(err)
 	}

@@ -255,7 +255,7 @@ func (json *JsonObject) GetArray(key string) (*JsonArray, error) {
 	val, ok := (*json).data[key]
 	if ok {
 		arr := NewJsonArray()
-		err := arr.Parse(&val)
+		err := arr.Parse(val)
 		if err != nil {
 			return nil, CouldNotParseError(key)
 		}
