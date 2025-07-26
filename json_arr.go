@@ -176,7 +176,7 @@ func (json *JsonArray) GetObject(index int) (*JsonObject, error) {
 	}
 	val := (*json).data[index]
 	obj := NewJsonObject()
-	err := obj.Parse(&val)
+	err := obj.Parse(val)
 	if err != nil {
 		return nil, CouldNotParseError(strconv.Itoa(index))
 	}

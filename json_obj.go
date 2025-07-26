@@ -62,11 +62,11 @@ import (
 //	if err != nil {
 //	    log.Printf("Failed to parse JSON: %v", err)
 //	}
-func (this *JsonObject) Parse(json *[]byte) error {
-	if len(*json) == 0 {
+func (this *JsonObject) Parse(json []byte) error {
+	if len(json) == 0 {
 		return nil
 	}
-	if (*json)[0] != '{' {
+	if (json)[0] != '{' {
 		return errors.New("Expected object")
 	}
 	keyStart := 0
@@ -77,37 +77,37 @@ func (this *JsonObject) Parse(json *[]byte) error {
 	quote := false
 	curly_delim := 0
 	square_delim := 0
-	for i < len((*json)) {
+	for i < len((json)) {
 		skipThrough(json, &i, '"')
 		keyStart = i
 		skipUntil(json, &i, '"')
 		keyEnd = i
 		skipToValue(json, &i)
 		valueStart = i
-		for i < len((*json)) {
-			if (*json)[i-1] != '\\' && (*json)[i] == '"' {
+		for i < len(json) {
+			if (json)[i-1] != '\\' && (json)[i] == '"' {
 				quote = !quote
 			}
-			if !quote && (*json)[i] == '{' {
+			if !quote && (json)[i] == '{' {
 				curly_delim++
 			}
-			if !quote && (*json)[i] == '}' {
+			if !quote && (json)[i] == '}' {
 				curly_delim--
 			}
-			if !quote && (*json)[i] == '[' {
+			if !quote && (json)[i] == '[' {
 				square_delim++
 			}
-			if !quote && (*json)[i] == ']' {
+			if !quote && (json)[i] == ']' {
 				square_delim--
 			}
-			if !quote && curly_delim <= 0 && square_delim <= 0 && ((*json)[i] == ',' || (*json)[i] == '}') {
+			if !quote && curly_delim <= 0 && square_delim <= 0 && (json[i] == ',' || json[i] == '}') {
 				break
 			}
 			i++
 		}
 		valueEnd = i
 
-		this.data[string((*json)[keyStart:keyEnd])] = (*json)[valueStart:valueEnd]
+		this.data[string(json[keyStart:keyEnd])] = json[valueStart:valueEnd]
 
 		i++
 	}
@@ -242,7 +242,7 @@ func (json *JsonObject) GetObject(key string) (*JsonObject, error) {
 	val, ok := (*json).data[key]
 	if ok {
 		obj := NewJsonObject()
-		err := obj.Parse(&val)
+		err := obj.Parse(val)
 		if err != nil {
 			return nil, CouldNotParseError(key)
 		}
