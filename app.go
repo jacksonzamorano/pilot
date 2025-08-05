@@ -1,7 +1,8 @@
-package pilot_http
+package pilot
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"log"
@@ -10,8 +11,6 @@ import (
 	"os/signal"
 	"strings"
 	"sync"
-
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type RouteStateCompatible any
@@ -23,14 +22,13 @@ type Application[RouteState RouteStateCompatible] struct {
 	CorsHeaders      string
 	CorsMethods      string
 	SilentMode       bool
-	Database         *pgxpool.Pool
-	Configuration    DatabaseConfiguration
+	Database         *sql.DB
 	Context          context.Context
 	WorkerCount      int32
 	LogRequestsLevel int
 }
 
-func NewInlineApplication[RouteState any](port string, cfg DatabaseConfiguration, ctx context.Context) *Application[RouteState] {
+func NewInlineApplication[RouteState any](port string, db *sql.DB, ctx context.Context) *Application[RouteState] {
 	return &Application[RouteState]{
 		Port:             port,
 		CorsOrigin:       "*",
@@ -38,15 +36,14 @@ func NewInlineApplication[RouteState any](port string, cfg DatabaseConfiguration
 		CorsMethods:      "GET, PUT, POST, DELETE, HEAD, PATCH",
 		Routes:           NewRouteCollection[RouteState](),
 		SilentMode:       false,
-		Database:         nil,
+		Database:         db,
 		WorkerCount:      10,
 		Context:          ctx,
-		Configuration:    cfg,
 		LogRequestsLevel: 0,
 	}
 }
 
-func NewApplication[RouteState any](port string, cfg DatabaseConfiguration) *Application[RouteState] {
+func NewApplication[RouteState any](port string, db *sql.DB) *Application[RouteState] {
 	ctx, _ := signal.NotifyContext(context.Background(), os.Interrupt, os.Kill)
 
 	return &Application[RouteState]{
@@ -56,10 +53,9 @@ func NewApplication[RouteState any](port string, cfg DatabaseConfiguration) *App
 		CorsMethods:      "GET, PUT, POST, DELETE, HEAD, PATCH",
 		Routes:           NewRouteCollection[RouteState](),
 		SilentMode:       false,
-		Database:         nil,
+		Database:         db,
 		WorkerCount:      10,
 		Context:          ctx,
-		Configuration:    cfg,
 		LogRequestsLevel: 0,
 	}
 }
@@ -78,16 +74,6 @@ func (a *Application[RouteState]) AddRouteGroup(prefix string, rg *RouteGroup[Ro
 }
 
 func (a *Application[RouteState]) Start() {
-	pgConfig, err := pgxpool.ParseConfig(a.Configuration.GetConnectionString())
-	if err != nil {
-		panic(err)
-	}
-	pgConfig.MaxConns = a.WorkerCount
-	pool, err := pgxpool.NewWithConfig(a.Context, pgConfig)
-	if err != nil {
-		panic(err)
-	}
-	a.Database = pool
 	if !a.SilentMode {
 		fmt.Printf("Starting server on port %v.\n\nRegistered routes:\n", a.Port)
 		a.Routes.PrintTree()
@@ -142,26 +128,13 @@ func handlerLog(id int32, connId int64, ip net.Addr, msg string) {
 }
 
 func handleRequest[RouteState any](conn <-chan net.Conn, app *Application[RouteState], cn context.Context, id int32) {
-	db, err := (*app).Database.Acquire(cn)
-	if err != nil {
-		if !errors.Is(err, context.Canceled) {
-			panic(err)
-		}
-		log.Printf("Worker #%d could not aquire a database connection.", id)
-		return
-	}
 	var connId int64 = 0
 	log.Printf("Worker #%d online, ready for requests.", id)
 ReqLoop:
 	for {
 		select {
 		case <-cn.Done():
-			if db != nil {
-				log.Printf("Worker #%d shutdown (closed connection).", id)
-				db.Release()
-			} else {
-				log.Printf("Worker #%d shutdown.", id)
-			}
+			log.Printf("Worker #%d shutdown.", id)
 			return
 		case conn := <-conn:
 			connId++
@@ -220,7 +193,7 @@ ReqLoop:
 			routeData := RouteRequest[RouteState]{
 				Context:  cn,
 				Request:  request,
-				Database: db,
+				Database: app.Database,
 				State:    &routeState,
 			}
 

@@ -13,20 +13,8 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: 1.22
-      - name: Build Pilot DB
-        run: go build -v pilot-db/*
-      - name: Test Pilot DB
-        run: go test -v pilot-db/*
-      - name: Build Pilot HTTP
-        run: go build -v pilot-http/*
-      - name: Test Pilot HTTP
-        run: go test -v pilot-http/*
-      - name: Build Pilot JSON
-        run: go build -v pilot-json/*
-      - name: Test Pilot JSON
-        run: go test -v pilot-json/*
-      - name: Build Pilot Exchange
-        run: go build -v pilot-exchange/*
-      - name: Test Pilot Exchange
-        run: go test -v pilot-exchange/*
+      - name: Build
+        run: go build -v
+      - name: Test
+        run: go test -v
 

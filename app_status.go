@@ -1,4 +1,4 @@
-package pilot_http
+package pilot
 
 type StatusCode int
 

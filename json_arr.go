@@ -1,4 +1,4 @@
-package pilot_json
+package pilot
 
 import (
 	"errors"
@@ -17,15 +17,15 @@ func NewJsonArray() *JsonArray {
 	}
 }
 
-func (this *JsonArray) Parse(json *[]byte) error {
+func (this *JsonArray) Parse(json []byte) error {
 	i := 0
 	for {
-		if (*json)[i] == '[' {
+		if (json)[i] == '[' {
 			i++
 			break
 		}
 		i++
-		if i == len(*json) {
+		if i == len(json) {
 			return errors.New("Expected array")
 		}
 	}
@@ -33,36 +33,36 @@ func (this *JsonArray) Parse(json *[]byte) error {
 	curly_delim := 0
 	square_delim := 0
 	quote := false
-	for i < len((*json))-1 {
+	for i < len(json)-1 {
 		valueStart = i
-		for i < len((*json))-1 {
-			if (i < 1 || (*json)[i-1] != '\\') && (*json)[i] == '"' {
+		for i < len(json)-1 {
+			if (i < 1 || json[i-1] != '\\') && json[i] == '"' {
 				quote = !quote
 			}
-			if !quote && (*json)[i] == '{' {
+			if !quote && json[i] == '{' {
 				curly_delim++
 			}
-			if !quote && (*json)[i] == '}' {
+			if !quote && json[i] == '}' {
 				curly_delim--
 			}
-			if !quote && (*json)[i] == '[' {
+			if !quote && json[i] == '[' {
 				square_delim++
 			}
-			if !quote && (*json)[i] == ']' {
+			if !quote && json[i] == ']' {
 				square_delim--
 			}
-			if !quote && curly_delim <= 0 && square_delim <= 0 && ((*json)[i] == ',' || (*json)[i] == ']') {
+			if !quote && curly_delim <= 0 && square_delim <= 0 && (json[i] == ',' || json[i] == ']') {
 				break
 			}
 			i++
 		}
-		this.data = append(this.data, (*json)[valueStart:i])
+		this.data = append(this.data, json[valueStart:i])
 		i++
 	}
 	return nil
 }
 
-func (json *JsonArray) GetTrimmedData(index int) ([]byte, *JsonFieldError) {
+func (json *JsonArray) GetTrimmedData(index int) ([]byte, error) {
 	if index < 0 || index >= len(json.data) {
 		return nil, NoFieldError(strconv.Itoa(index))
 	}
@@ -87,7 +87,7 @@ func (json *JsonArray) GetTrimmedData(index int) ([]byte, *JsonFieldError) {
 	return val[innerIdx:innerEnd+1], nil
 }
 
-func (json *JsonArray) GetString(index int) (*string, *JsonFieldError) {
+func (json *JsonArray) GetString(index int) (*string, error) {
 	if index < 0 || index >= len(json.data) {
 		return nil, NoFieldError(strconv.Itoa(index))
 	}
@@ -96,7 +96,7 @@ func (json *JsonArray) GetString(index int) (*string, *JsonFieldError) {
 	return &str, nil
 }
 
-func (json *JsonArray) GetInt32(index int) (*int32, *JsonFieldError) {
+func (json *JsonArray) GetInt32(index int) (*int32, error) {
 	d, verr := json.GetTrimmedData(index)
 	if verr != nil {
 		return nil, verr
@@ -109,7 +109,7 @@ func (json *JsonArray) GetInt32(index int) (*int32, *JsonFieldError) {
 	return &i_sized, nil
 }
 
-func (json *JsonArray) GetInt64(index int) (*int64, *JsonFieldError) {
+func (json *JsonArray) GetInt64(index int) (*int64, error) {
 	d, verr := json.GetTrimmedData(index)
 	if verr != nil {
 		return nil, verr
@@ -121,7 +121,7 @@ func (json *JsonArray) GetInt64(index int) (*int64, *JsonFieldError) {
 	return &i, nil
 }
 
-func (json *JsonArray) GetFloat32(index int) (*float32, *JsonFieldError) {
+func (json *JsonArray) GetFloat32(index int) (*float32, error) {
 	d, verr := json.GetTrimmedData(index)
 	if verr != nil {
 		return nil, verr
@@ -134,7 +134,7 @@ func (json *JsonArray) GetFloat32(index int) (*float32, *JsonFieldError) {
 	return &f_sized, nil
 }
 
-func (json *JsonArray) GetFloat64(index int) (*float64, *JsonFieldError) {
+func (json *JsonArray) GetFloat64(index int) (*float64, error) {
 	d, verr := json.GetTrimmedData(index)
 	if verr != nil {
 		return nil, verr
@@ -146,7 +146,7 @@ func (json *JsonArray) GetFloat64(index int) (*float64, *JsonFieldError) {
 	return &f, nil
 }
 
-func (json *JsonArray) GetBool(index int) (*bool, *JsonFieldError) {
+func (json *JsonArray) GetBool(index int) (*bool, error) {
 	d, verr := json.GetTrimmedData(index)
 	if verr != nil {
 		return nil, verr
@@ -158,7 +158,7 @@ func (json *JsonArray) GetBool(index int) (*bool, *JsonFieldError) {
 	return &b, nil
 }
 
-func (json *JsonArray) GetUuid(index int) (*uuid.UUID, *JsonFieldError) {
+func (json *JsonArray) GetUuid(index int) (*uuid.UUID, error) {
 	d, verr := json.GetTrimmedData(index)
 	if verr != nil {
 		return nil, verr
@@ -170,33 +170,33 @@ func (json *JsonArray) GetUuid(index int) (*uuid.UUID, *JsonFieldError) {
 	return &id, nil
 }
 
-func (json *JsonArray) GetObject(index int) (*JsonObject, *JsonFieldError) {
+func (json *JsonArray) GetObject(index int) (*JsonObject, error) {
 	if index < 0 || index >= len(json.data) {
 		return nil, NoFieldError(strconv.Itoa(index))
 	}
 	val := (*json).data[index]
 	obj := NewJsonObject()
-	err := obj.Parse(&val)
+	err := obj.Parse(val)
 	if err != nil {
 		return nil, CouldNotParseError(strconv.Itoa(index))
 	}
 	return obj, nil
 }
 
-func (json *JsonArray) GetArray(index int) (*JsonArray, *JsonFieldError) {
+func (json *JsonArray) GetArray(index int) (*JsonArray, error) {
 	if index < 0 || index >= len(json.data) {
 		return nil, NoFieldError(strconv.Itoa(index))
 	}
 	val := (*json).data[index]
 	arr := NewJsonArray()
-	err := arr.Parse(&val)
+	err := arr.Parse(val)
 	if err != nil {
 		return nil, CouldNotParseError(strconv.Itoa(index))
 	}
 	return arr, nil
 }
 
-func (json *JsonArray) GetData(index int) (*[]byte, *JsonFieldError) {
+func (json *JsonArray) GetData(index int) (*[]byte, error) {
 	if index < 0 || index >= len(json.data) {
 		return nil, NoFieldError(strconv.Itoa(index))
 	}

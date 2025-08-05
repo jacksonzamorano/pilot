@@ -1,4 +1,4 @@
-package pilot_json
+package pilot
 
 type JsonFieldError struct {
 	field     string
@@ -32,26 +32,26 @@ type JsonDecodable interface {
 	Decode(json []byte) error
 }
 
-func skipUntil(buffer *[]byte, i *int, until byte) {
-	for (*i) < len(*buffer) {
-		if (*buffer)[*i] == until {
+func skipUntil(buffer []byte, i *int, until byte) {
+	for (*i) < len(buffer) {
+		if (buffer)[*i] == until {
 			return
 		}
 		(*i)++
 	}
 }
-func skipThrough(buffer *[]byte, i *int, until byte) {
-	for (*i) < len(*buffer) {
-		if (*buffer)[*i] == until {
+func skipThrough(buffer []byte, i *int, until byte) {
+	for (*i) < len(buffer) {
+		if (buffer)[*i] == until {
 			(*i)++
 			return
 		}
 		(*i)++
 	}
 }
-func skipToValue(buffer *[]byte, i *int) {
-	for (*i) < len(*buffer) {
-		if (*buffer)[*i] == ' ' || (*buffer)[*i] == ':' {
+func skipToValue(buffer []byte, i *int) {
+	for (*i) < len(buffer) {
+		if (buffer)[*i] == ' ' || (buffer)[*i] == ':' {
 			(*i)++
 			return
 		}

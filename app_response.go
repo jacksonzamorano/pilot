@@ -1,8 +1,9 @@
-package pilot_http
+package pilot
 
 import (
 	"bufio"
 	"encoding/json"
+	"log"
 	"net"
 	"strconv"
 	"strings"
@@ -29,9 +30,10 @@ func StringResponse(body string) *HttpResponse {
 	return res
 }
 func ErrorResponse(body error) *HttpResponse {
+	log.Printf("[ERROR]: %v", body.Error())
 	errorResponse := genericResponse{
 		Status:  false,
-		Message: body.Error(),
+		Message: "An error occurred and your request could not be completed.",
 	}
 	json, _ := json.Marshal(errorResponse)
 	res := NewHttpResponse()

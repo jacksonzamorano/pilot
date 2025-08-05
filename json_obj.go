@@ -1,4 +1,4 @@
-// Package pilot_json provides a custom JSON parsing and validation library that offers
+// Package pilot provides a custom JSON parsing and validation library that offers
 // more granular control and better error handling than the standard encoding/json package.
 // This package is designed for scenarios where you need field-by-field validation,
 // custom error messages, and more control over the JSON parsing process.
@@ -19,13 +19,13 @@
 // Usage Example:
 //
 //	jsonData := []byte(`{"name":"John","age":30,"email":"john@example.com"}`)
-//	obj := pilot_json.NewJsonObject()
+//	obj := pilot.NewJsonObject()
 //	err := obj.Parse(&jsonData)
 //
 //	name, err := obj.GetString("name")
 //	age, err := obj.GetInt32("age")
 //	email, err := obj.GetString("email")
-package pilot_json
+package pilot
 
 import (
 	"errors"
@@ -57,16 +57,16 @@ import (
 // Example:
 //
 //	jsonData := []byte(`{"name":"John","age":30,"active":true}`)
-//	obj := pilot_json.NewJsonObject()
+//	obj := pilot.NewJsonObject()
 //	err := obj.Parse(&jsonData)
 //	if err != nil {
 //	    log.Printf("Failed to parse JSON: %v", err)
 //	}
-func (this *JsonObject) Parse(json *[]byte) error {
-	if len(*json) == 0 {
+func (this *JsonObject) Parse(json []byte) error {
+	if len(json) == 0 {
 		return nil
 	}
-	if (*json)[0] != '{' {
+	if (json)[0] != '{' {
 		return errors.New("Expected object")
 	}
 	keyStart := 0
@@ -77,37 +77,37 @@ func (this *JsonObject) Parse(json *[]byte) error {
 	quote := false
 	curly_delim := 0
 	square_delim := 0
-	for i < len((*json)) {
-		skipThrough(&(*json), &i, '"')
+	for i < len((json)) {
+		skipThrough(json, &i, '"')
 		keyStart = i
-		skipUntil(&(*json), &i, '"')
+		skipUntil(json, &i, '"')
 		keyEnd = i
-		skipToValue(&(*json), &i)
+		skipToValue(json, &i)
 		valueStart = i
-		for i < len((*json)) {
-			if (*json)[i-1] != '\\' && (*json)[i] == '"' {
+		for i < len(json) {
+			if (json)[i-1] != '\\' && (json)[i] == '"' {
 				quote = !quote
 			}
-			if !quote && (*json)[i] == '{' {
+			if !quote && (json)[i] == '{' {
 				curly_delim++
 			}
-			if !quote && (*json)[i] == '}' {
+			if !quote && (json)[i] == '}' {
 				curly_delim--
 			}
-			if !quote && (*json)[i] == '[' {
+			if !quote && (json)[i] == '[' {
 				square_delim++
 			}
-			if !quote && (*json)[i] == ']' {
+			if !quote && (json)[i] == ']' {
 				square_delim--
 			}
-			if !quote && curly_delim <= 0 && square_delim <= 0 && ((*json)[i] == ',' || (*json)[i] == '}') {
+			if !quote && curly_delim <= 0 && square_delim <= 0 && (json[i] == ',' || json[i] == '}') {
 				break
 			}
 			i++
 		}
 		valueEnd = i
 
-		this.data[string((*json)[keyStart:keyEnd])] = (*json)[valueStart:valueEnd]
+		this.data[string(json[keyStart:keyEnd])] = json[valueStart:valueEnd]
 
 		i++
 	}
@@ -128,7 +128,7 @@ func (this *JsonObject) Parse(json *[]byte) error {
 //
 // Example:
 //
-//	obj := pilot_json.NewJsonObject()
+//	obj := pilot.NewJsonObject()
 //	err := obj.Parse(&jsonBytes)
 //
 //	// Type-safe field access with error handling
@@ -149,7 +149,7 @@ type JsonObject struct {
 //
 // Example:
 //
-//	obj := pilot_json.NewJsonObject()
+//	obj := pilot.NewJsonObject()
 //	err := obj.Parse(&jsonData)
 //
 //	// Now you can access fields from the parsed JSON
@@ -160,7 +160,11 @@ func NewJsonObject() *JsonObject {
 	}
 }
 
-func (json *JsonObject) GetString(key string) (*string, *JsonFieldError) {
+type JsonReadable interface {
+	FromJson() error
+}
+
+func (json *JsonObject) GetString(key string) (*string, error) {
 	val, ok := (*json).data[key]
 	if ok {
 		str := string(val[1 : len(val)-1])
@@ -169,7 +173,7 @@ func (json *JsonObject) GetString(key string) (*string, *JsonFieldError) {
 	return nil, NoFieldError(key)
 }
 
-func (json *JsonObject) GetInt32(key string) (*int32, *JsonFieldError) {
+func (json *JsonObject) GetInt32(key string) (*int32, error) {
 	val, ok := (*json).data[key]
 	if ok {
 		i, err := strconv.ParseInt(string(val), 10, 32)
@@ -182,7 +186,7 @@ func (json *JsonObject) GetInt32(key string) (*int32, *JsonFieldError) {
 	return nil, NoFieldError(key)
 }
 
-func (json *JsonObject) GetInt64(key string) (*int64, *JsonFieldError) {
+func (json *JsonObject) GetInt64(key string) (*int64, error) {
 	val, ok := (*json).data[key]
 	if ok {
 		i, err := strconv.ParseInt(string(val), 10, 64)
@@ -194,7 +198,7 @@ func (json *JsonObject) GetInt64(key string) (*int64, *JsonFieldError) {
 	return nil, NoFieldError(key)
 }
 
-func (json *JsonObject) GetFloat32(key string) (*float32, *JsonFieldError) {
+func (json *JsonObject) GetFloat32(key string) (*float32, error) {
 	val, ok := (*json).data[key]
 	if ok {
 		str := string(val)
@@ -208,7 +212,7 @@ func (json *JsonObject) GetFloat32(key string) (*float32, *JsonFieldError) {
 	return nil, NoFieldError(key)
 }
 
-func (json *JsonObject) GetFloat64(key string) (*float64, *JsonFieldError) {
+func (json *JsonObject) GetFloat64(key string) (*float64, error) {
 	val, ok := (*json).data[key]
 	if ok {
 		str := string(val)
@@ -221,7 +225,7 @@ func (json *JsonObject) GetFloat64(key string) (*float64, *JsonFieldError) {
 	return nil, NoFieldError(key)
 }
 
-func (json *JsonObject) GetBool(key string) (*bool, *JsonFieldError) {
+func (json *JsonObject) GetBool(key string) (*bool, error) {
 	val, ok := (*json).data[key]
 	if ok {
 		str := string(val)
@@ -234,11 +238,11 @@ func (json *JsonObject) GetBool(key string) (*bool, *JsonFieldError) {
 	return nil, NoFieldError(key)
 }
 
-func (json *JsonObject) GetObject(key string) (*JsonObject, *JsonFieldError) {
+func (json *JsonObject) GetObject(key string) (*JsonObject, error) {
 	val, ok := (*json).data[key]
 	if ok {
 		obj := NewJsonObject()
-		err := obj.Parse(&val)
+		err := obj.Parse(val)
 		if err != nil {
 			return nil, CouldNotParseError(key)
 		}
@@ -247,11 +251,11 @@ func (json *JsonObject) GetObject(key string) (*JsonObject, *JsonFieldError) {
 	return nil, NoFieldError(key)
 }
 
-func (json *JsonObject) GetArray(key string) (*JsonArray, *JsonFieldError) {
+func (json *JsonObject) GetArray(key string) (*JsonArray, error) {
 	val, ok := (*json).data[key]
 	if ok {
 		arr := NewJsonArray()
-		err := arr.Parse(&val)
+		err := arr.Parse(val)
 		if err != nil {
 			return nil, CouldNotParseError(key)
 		}
@@ -260,7 +264,7 @@ func (json *JsonObject) GetArray(key string) (*JsonArray, *JsonFieldError) {
 	return nil, NoFieldError(key)
 }
 
-func (json *JsonObject) GetData(key string) (*[]byte, *JsonFieldError) {
+func (json *JsonObject) GetData(key string) (*[]byte, error) {
 	val, ok := (*json).data[key]
 	if ok {
 		return &val, nil
@@ -268,7 +272,7 @@ func (json *JsonObject) GetData(key string) (*[]byte, *JsonFieldError) {
 	return nil, NoFieldError(key)
 }
 
-func (json *JsonObject) GetTime(key string) (*time.Time, *JsonFieldError) {
+func (json *JsonObject) GetTime(key string) (*time.Time, error) {
 	val, ok := (*json).data[key]
 	if ok {
 		if len(val) < 2 {
@@ -283,7 +287,7 @@ func (json *JsonObject) GetTime(key string) (*time.Time, *JsonFieldError) {
 	return nil, NoFieldError(key)
 }
 
-func (json *JsonObject) GetUuid(key string) (*uuid.UUID, *JsonFieldError) {
+func (json *JsonObject) GetUuid(key string) (*uuid.UUID, error) {
 	val, ok := (*json).data[key]
 	if ok {
 		uuid, err := uuid.ParseBytes(val)
