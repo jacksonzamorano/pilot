@@ -16,6 +16,8 @@ import (
 	"github.com/google/uuid"
 )
 
+// RouteRequest encapsulates all context and resources needed by route handlers.
+// Provides access to HTTP request details, database connection, application context, and typed route state.
 type RouteRequest[T any] struct {
 	Request  *HttpRequest
 	Database *sql.DB
@@ -23,6 +25,8 @@ type RouteRequest[T any] struct {
 	State    *T
 }
 
+// HttpRequest represents a parsed HTTP request with convenient access methods.
+// Provides structured access to headers, body content, query parameters, and path components.
 type HttpRequest struct {
 	Path        string
 	QueryString string
@@ -33,6 +37,8 @@ type HttpRequest struct {
 	_tempMap    *map[string]string
 }
 
+// QueryMap parses the query string into a map of key-value pairs with URL decoding.
+// Handles complete query string parsing including URL encoding/decoding and multiple parameters.
 func (req *HttpRequest) QueryMap() map[string]string {
 	res := make(map[string]string)
 	keyStart := 0
@@ -56,6 +62,9 @@ func (req *HttpRequest) QueryMap() map[string]string {
 	}
 	return res
 }
+
+// QueryGetInt32 extracts a query parameter as a 32-bit signed integer.
+// Returns nil if parameter is missing or cannot be parsed as int32.
 func (req *HttpRequest) QueryGetInt32(key string) *int32 {
 	if req._tempMap == nil {
 		m := req.QueryMap()
@@ -71,6 +80,9 @@ func (req *HttpRequest) QueryGetInt32(key string) *int32 {
 	}
 	return nil
 }
+
+// QueryGetInt64 extracts a query parameter as a 64-bit signed integer.
+// Returns nil if parameter is missing or cannot be parsed as int64.
 func (req *HttpRequest) QueryGetInt64(key string) *int64 {
 	if req._tempMap == nil {
 		m := req.QueryMap()
@@ -86,6 +98,9 @@ func (req *HttpRequest) QueryGetInt64(key string) *int64 {
 	}
 	return nil
 }
+
+// QueryGetString extracts a query parameter as a URL-decoded string.
+// Returns nil if parameter is missing, but returns pointer to empty string for empty parameters.
 func (req *HttpRequest) QueryGetString(key string) *string {
 	if req._tempMap == nil {
 		m := req.QueryMap()
@@ -97,6 +112,9 @@ func (req *HttpRequest) QueryGetString(key string) *string {
 	}
 	return nil
 }
+
+// QueryGetUUID extracts and validates a query parameter as a UUID.
+// Returns nil if parameter is missing or not a valid UUID format.
 func (req *HttpRequest) QueryGetUUID(key string) *uuid.UUID {
 	if req._tempMap == nil {
 		m := req.QueryMap()
@@ -113,6 +131,8 @@ func (req *HttpRequest) QueryGetUUID(key string) *uuid.UUID {
 	return &g
 }
 
+// Dump outputs a formatted representation of the HTTP request for debugging.
+// Prints all request components including method, path, query string, headers, and body.
 func (req *HttpRequest) Dump() {
 	fmt.Printf("Method: %v\n", req.Method)
 	fmt.Printf("Path: %v\n", req.Path)
@@ -125,6 +145,9 @@ func (req *HttpRequest) Dump() {
 	}
 }
 
+// ParseRequest reads and parses an HTTP request from a TCP connection.
+// Implements complete HTTP/1.1 request parser with timeout handling.
+// Returns nil for malformed requests or connection errors.
 func ParseRequest(incoming *net.Conn) *HttpRequest {
 	(*incoming).SetReadDeadline(time.Now().Add(time.Second * 10))
 	req := HttpRequest{
